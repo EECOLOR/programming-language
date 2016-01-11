@@ -65,25 +65,6 @@ Keyword definition
     }
   }
 
-  syntax LocalTypeInference {
-    when {
-      val 'id1 : 'Type1
-    }
-    syntax {
-      val 'id2 = 'id1
-    }
-    replace with {
-      val 'id2 : 'Type1 = 'id1
-    }
-
-    syntax {
-      val 'id0 : 'Type1 => 'Type1 = 'id1 => 'id1
-    }
-    replace with {
-      val 'id0: 'Type1 => 'Type1 = 'id1 : 'Type1 => 'id1
-    }
-  }
-
   syntax ApplyUnit {
 
     when {
@@ -119,6 +100,23 @@ Keyword definition
     replace with {
       val 'id3 : ('Type1 => X) => ('Type2 => X) => X = x => y => x('id1)
       val 'id4 : ('Type1 => X) => ('Type2 => X) => X = x => y => y('id2)
+    }
+  }
+
+  syntax Switch {
+    when {
+      val 'id0 : 'Type1 | 'Type2
+      val 'body1 : 'Type3
+      val 'body2 : 'Type4
+    }
+    syntax {
+      'id0 match {
+        case 'id1 : 'Type1 => 'body1
+        case 'id2 : 'Type2 => 'body2
+      }
+    }
+    replace with {
+      'id0('id1 => 'body1 : 'Type3 | 'Type4, 'id2 => 'body2 : 'Type3 | 'Type4)
     }
   }
 
@@ -180,6 +178,35 @@ Keyword definition
     }
     replace with {
       val 'id0 : 'Type1 => 'Type2 => 'Type0 = 'id1 => 'id2 => 'body
+    }
+  }
+
+  syntax LocalTypeInference {
+    when {
+      val 'id1 : 'Type1
+    }
+    syntax {
+      val 'id2 = 'id1
+    }
+    replace with {
+      val 'id2 : 'Type1 = 'id1
+    }
+
+    syntax {
+      val 'id0 : 'Type1 => 'Type1 = 'id1 => 'id1
+    }
+    replace with {
+      val 'id0: 'Type1 => 'Type1 = 'id1 : 'Type1 => 'id1
+    }
+
+    when {
+      val 'body : 'Type2
+    }
+    syntax {
+      def 'id0('id1: 'Type1) = 'body
+    }
+    replace with {
+      def 'id0('id1: 'Type1): 'Type2 = 'body
     }
   }
 
@@ -349,6 +376,23 @@ Keyword definition
     }
   }
 
+  syntax TraitExpansion {
+    when {
+      trait 'Type0 {
+        'id1: 'Type1
+        'id2: 'Type2
+      }
+      val 'id0: 'Type0
+    }
+    syntax {
+      'Type0('id3, 'id4) = 'id0
+    }
+    replace with {
+      val 'id3 = 'id0.'id1
+      val 'id4 = 'id0.'id2
+    }
+  }
+
   syntax Class {
 
     // similar to what was previously known as a case class
@@ -513,14 +557,60 @@ Keyword definition
     }
   }
 
+  syntax This {
+    syntax {
+      trait 'Type0 {
+        'id1:'Type1
+        val 'id2 = this
+      }
+    }
+    replace with {
+      val Old_Type0: 'Type1 => 'Type0 = 'Type0
+      // constructor
+      val 'Type0: 'Type1 => 'Type0 = 'id1 => {
+        val this = Old_Type0('id1)
+
+      }
+      trait 'Type0 {
+
+      }
+    }
+  }
+
   syntax StructuralType {
 
-    // ... local type inference for method arguments and val definitions
+    provides {
+      trait Structural
+    }
 
     syntax {
-      val 'id0 : { 'id1 } = ...
-      val 'id2 = 'id0.'id1
+      def 'id0 ('id1 : { 'id2 : 'Type1 }) = {
+        'id1.'id2
+      }
     }
+    replace with {
+      trait *FreshName1 with Structural {
+        'id2 : 'Type1
+      }
+      def 'id0 ('id1 : *FreshName1): 'Type2 = {
+        'id1.'id2
+      }
+    }
+  }
+
+  syntax StructuralTypeInference {
+
+    syntax {
+      def 'id0('id1) = {
+        'id1.'id2
+      }
+    }
+    replace with {
+      def 'id0('id1: { 'id1 }) = {
+        'id1.'id2
+      }
+    }
+
   }
 
   syntax List {
