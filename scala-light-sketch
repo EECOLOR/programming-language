@@ -1,0 +1,583 @@
+First attempt at a sketch of 'scala-light', a language with syntax and semantics similar to Scala.
+
+// This document is a sketch, it's not complete. It needs more structured definitions.
+
+// It does not represent my vision of a good programming language, it's a text-based language and textual
+// representation is too limiting for what I envision to be a good programming language.
+
+Conventions
+
+- Types identifiers start with an upper case letter
+- Value identifiers start with a lower case letter unless it's a constructor
+
+Type type
+
+  Type
+
+
+Type assignment
+
+  : Type
+
+
+Function type
+
+  A => B
+
+
+Function creation
+
+  ( argument : A => body : B ) : A => B
+
+
+Unit type
+
+  ()
+
+
+Unit creation
+
+  unit
+
+
+Function application
+
+  ( (argument : A => body : B)(value : A) ) : B
+
+
+Identifier type
+
+  Identifier
+
+
+
+Keyword definition
+
+  syntax Val {
+
+    syntax {
+      val 'id : 'Type = 'body
+    }
+    // this is not precise enough, interaction between val definitions in a body
+    // determine the order in which they are enclosing the others
+    replace *enclosingBody with {
+      ( ('id : 'Type) => *enclosingBody )('body)
+    }
+  }
+
+  syntax LocalTypeInference {
+    when {
+      val 'id1 : 'Type1
+    }
+    syntax {
+      val 'id2 = 'id1
+    }
+    replace with {
+      val 'id2 : 'Type1 = 'id1
+    }
+
+    syntax {
+      val 'id0 : 'Type1 => 'Type1 = 'id1 => 'id1
+    }
+    replace with {
+      val 'id0: 'Type1 => 'Type1 = 'id1 : 'Type1 => 'id1
+    }
+  }
+
+  syntax ApplyUnit {
+
+    when {
+      val 'id : () => 'Type
+    }
+
+    syntax {
+      'id
+    }
+    replace with {
+      'id(unit)
+    }
+
+    syntax {
+      'id()
+    }
+    replace with {
+      'id(unit)
+    }
+  }
+
+  syntax Coproduct {
+
+    when {
+      val 'id1 : 'Type1
+      val 'id2 : 'Type2
+    }
+
+    syntax {
+      val 'id3 : 'Type1 | 'Type2 = 'id1
+      val 'id4 : 'Type1 | 'Type2 = 'id2
+    }
+    replace with {
+      val 'id3 : ('Type1 => X) => ('Type2 => X) => X = x => y => x('id1)
+      val 'id4 : ('Type1 => X) => ('Type2 => X) => X = x => y => y('id2)
+    }
+  }
+
+  syntax Product {
+
+    when {
+      val 'id1 : 'Type1
+      val 'id2 : 'Type2
+    }
+    syntax {
+      val 'id0 : ('Type1, 'Type2) = ('id1, 'id2)
+    }
+    replaceWith {
+      val 'id0 : ('Type1 => 'Type2 => X) => X = f => f('id1)('id2)
+    }
+  }
+
+  syntax ProductExpansion {
+    when {
+      val 'id0 : ('Type1, 'Type2, 'Type3)
+    }
+
+    syntax {
+      ('id1, 'id2, 'id3) = 'id0
+    }
+    replace with {
+      val 'id1 : 'Type1 = 'id0(x => y => z => x)
+      val 'id2 : 'Type2 = 'id0(x => y => z => y)
+      val 'id3 : 'Type2 = 'id0(x => y => z => z)
+    }
+  }
+
+  syntax ApplyProduct {
+    when {
+      val 'id : 'Type1 => 'Type2 => 'Type3
+      val 'id1 : 'Type1
+      val 'id2 : 'Type2
+    }
+
+    syntax {
+      'id( 'id1, 'id2 )
+    }
+    replace with {
+      'id('id1)('id2)
+    }
+  }
+
+  syntax Def {
+
+    syntax {
+      def 'id : 'Type = 'body
+    }
+    replace with {
+      val 'id : () => 'Type = x  => 'body
+    }
+
+    syntax {
+      def 'id0 ('id1: 'Type1, 'id2: 'Type2): 'Type0 = 'body
+    }
+    replace with {
+      val 'id0 : 'Type1 => 'Type2 => 'Type0 = 'id1 => 'id2 => 'body
+    }
+  }
+
+  syntax Block {
+
+    when {
+      val 'id1 : 'Type1
+      val 'id2 : 'Type2
+    }
+
+    syntax {
+      {
+        'id1
+        'id2
+      }
+    }
+    replace with {
+      ( x : 'Type1 => y : 'Type2 => y )('id1, 'id2)
+    }
+  }
+
+  syntax FunctionBlock {
+
+    syntax {
+      { x =>
+        'body
+      }
+    }
+    replace with {
+      x => {
+        'body
+      }
+    }
+  }
+
+  syntax Trait {
+
+    // Traits can be used for what we usually call 'Marker interfaces', 'Interfaces', 'Abstract classes' and 'Classes'
+
+    // No more access modifiers other that 'private' which is used to keep implementation details hidden and still allow
+    // your code to be broken down into smaller pieces that might be used by more than one public member.
+
+    syntax {
+      trait 'Type
+    }
+    replace with {
+      val 'Type : Type = ()
+      val 'Type : 'Type = unit
+    }
+
+    syntax {
+      trait 'Type0 {
+        'id1 : 'Type1
+        'id2 : 'Type2
+      }
+    }
+    replace with {
+      val 'Type0_Id1 : Type = Identifier
+      val 'Type0_Id2 : Type = Identifier
+      // It's ok to have two val declarations (arguments) with the same name, one represents a type, the other its constructor
+      val 'Type0 : Type = ( (Type0_Id1, Type0_Id1 => 'Type1), (Type0_Id2, Type0_Id2 => 'Type2) )
+      val 'Type0 : 'Type1 => 'Type2 => 'Type0 = 'id1 => 'id2 => ( ('id1, x => 'id1), ('id2, x => 'id2) )
+    }
+
+    syntax {
+      trait 'Type0 {
+        val 'id1 : 'Type1 = 'body1
+        def 'id2 : 'Type2 = 'body2
+        'id3 : 'Type3
+      }
+    }
+    replace with {
+      val 'Type0_Id1 : Type = Identifier
+      val 'Type0_Id2 : Type = Identifier
+      val 'Type0_Id3 : Type = Identifier
+      val 'Type0 : Type = ( ( Type0_Id1, Type0_Id1 => 'Type1 ), (Type0_Id2, Type0_Id2 => () => 'Type2), (Type0_Id3, Type0_Id3 => 'Type3) )
+      val 'Type0 : 'Type3 => 'Type0 = { 'id3 =>
+        val 'id1 : 'Type1 = 'body1
+        def 'id2 : 'Type2 = 'body2
+
+        ( ( 'id1, x => 'id1), ( 'id2, x => 'id2 ), ('id3, x => 'id3 ) )
+      }
+    }
+
+    syntax {
+      // if you want to expose a constructor argument, put it in the body
+      trait 'Type0( 'id1 : 'Type1 ) {
+        'id2: 'Type2
+        val 'id3 : 'Type3 = 'body3
+      }
+    }
+    replace with {
+      val 'Type0_Id2 : Type = Identifier
+      val 'Type0_Id3 : Type = Identifier
+      val 'Type0 : Type = ( (Type0_Id2, Type0_Id2 => 'Type2), (Type0_Id3, Type0_Id3 => 'Type3) )
+      val 'Type0 : 'Type1 => 'Type2 => 'Type0 = { 'id1 => 'id2 =>
+        val 'id3 : 'Type3 = 'body3
+
+        ( ('id2, x => 'id2), ('id3, x => 'id3) ) )
+      }
+    }
+
+    syntax {
+      trait 'Type0('id1 : 'Type1) {
+        val 'id2 : 'Type2 = 'body2
+        // replaced 'private' with '-'
+        - val 'id3 : 'Type3 = 'body3
+      }
+    }
+    repace with {
+      val 'Type0_Id2 : Type = Identifier
+      val 'Type0 : Type = ( (Type0_Id2, Type0_Id2 => 'Type2) )
+      val 'Type0 : 'Type1 => 'Type0 = { 'id1 =>
+        val 'id2 : 'Type2 = 'body2
+        val 'id3 : 'Type3 = 'body3
+
+        ( ('id2, x => 'id2) )
+      }
+    }
+  }
+
+  syntax TraitBlock {
+
+    when {
+      trait 'Trait('id0 : 'Type0) {
+        'id1 : 'Type1
+        'id2 : 'Type2
+      }
+    }
+
+    syntax {
+      'Trait('body0) {
+        val 'id2 : 'Type2 = 'body2
+        def 'id1 : 'Type1 = 'body1
+      }
+    }
+    replace with {
+      'Trait('body0, () => 'body1, 'body2)
+    }
+  }
+
+  syntax TraitMixin {
+
+    when {
+      trait 'Type1 {
+        'id4 : 'Type4
+      }
+      trait 'Type2 {
+        'id5 : 'Type5
+      }
+    }
+
+    syntax {
+      trait 'Type0 with 'Type1 with 'Type2 {
+        'id3 : 'Type3
+      }
+    }
+    replace with {
+      val 'Type0_Id3 : Type = Identifier
+      val 'Type0 : Type = ( (Type0_Id3, Type0_Id3 => 'Type3), (Type1_Id4, Type1_Id4 => 'Type4), (Type2_Id5, Type2_Id5 => 'Type5) )
+      val 'Type0 : 'Type3 => 'Type4 => 'Type5 => 'Type0 = { 'id3 => 'id4 => 'id4 =>
+        val (trait1Info) = 'Type1( 'id3 )
+        val (trait2Info) = 'Type2( 'id4 )
+
+        ( ('id3, x => 'id3), trait1Info, trait2Info )
+      }
+    }
+  }
+
+  syntax Class {
+
+    // similar to what was previously known as a case class
+
+    syntax {
+      class 'Type0( 'id1 : 'Type1, 'id2 : 'Type2 )
+    }
+    replace with {
+      trait 'Type0 {
+        'id1 : 'Type1
+        'id2 : 'Type2
+      }
+    }
+  }
+
+  syntax Object {
+
+    syntax {
+      object 'Type0 {
+        def 'id1 : 'Type1 = 'body1
+        - val 'id2 : 'Type2 = 'body2
+      }
+    }
+    replace with {
+      // not lazy, we might want to change that
+      trait 'Type0 {
+        def 'id1 : 'Type1 = 'body1
+        - val 'id2 : 'Type2 = 'body2
+      }
+    }
+  }
+
+  syntax MemberAccess {
+
+    when {
+      trait 'Trait {
+        'id1 : 'Type1
+        'id2 : 'Type2
+      }
+
+      val 'id0 : 'Trait
+    }
+
+    syntax {
+      'id0 . 'id1
+      'id0 . 'id2
+    }
+    replace with {
+      'id0(((id1, value1), (id2, value2)) => value1(id1))
+      'id0(((id1, value1), (id2, value2)) => value2(id2))
+    }
+  }
+
+  syntax Import {
+    when {
+      trait 'Type0 {
+        'id2: 'Type2,
+        'id3: 'Type3,
+        'id4: 'Type4
+      }
+
+      val 'id1 : 'Type0
+    }
+
+    syntax {
+      import 'id1.'id2
+    }
+    replace with {
+      val 'id2 = 'id1.id2
+    }
+
+    syntax {
+      import 'id1._
+    }
+    replace with {
+      val 'id2 = 'id1.'id2
+      val 'id3 = 'id1.'id3
+      val 'id4 = 'id1.'id4
+    }
+
+    syntax {
+      import 'id1[ 'id2 => 'id3, id3 => _, _ ]
+    }
+    replace with {
+      val 'id3 = 'id1.'id2
+      val 'id4 = 'id1.'id4
+    }
+  }
+
+  syntax Package {
+    syntax {
+      package 'id1.'id2 {
+        'body
+      }
+    }
+    replace with {
+      object 'id1 {
+        object 'id2 {
+          *body
+        }
+      }
+    }
+
+    syntax {
+      package 'id1.'id2
+
+      'body
+    }
+    replace with {
+      package 'id1.'id2 {
+        'body
+      }
+    }
+  }
+
+  syntax InfixApplication {
+
+    when {
+      trait 'Type1 {
+        'id2 : 'Type3 => 'Type2
+      }
+
+      val 'id1 : 'Type1
+      val 'id3 : 'Type3
+    }
+
+    syntax {
+      'id1 'id2 'id3
+    }
+    replace with {
+      'id1.'id2('id3)
+    }
+  }
+
+  syntax TypeApplication {
+
+    syntax {
+      'Type0['Type1]
+    }
+    replace with {
+      'Type0('Type1)
+    }
+  }
+
+  syntax TypeConstructor {
+
+    syntax {
+      // chose let because it's quite anoying to have 'type' as a reserved word
+      let 'Type0['Type1] = 'Type2
+    }
+    replace with {
+      val 'Type0: Type -> Type = 'Type1 => 'Type2
+    }
+  }
+
+  syntax Lazy {
+    syntax {
+      lazy val 'id : 'Type = 'body
+    }
+    replace with {
+      val 'id: () => 'Type = (body => x => body)('body)
+    }
+  }
+
+  syntax StructuralType {
+
+    // ... local type inference for method arguments and val definitions
+
+    syntax {
+      val 'id0 : { 'id1 } = ...
+      val 'id2 = 'id0.'id1
+    }
+  }
+
+  syntax List {
+
+    provides {
+      let List[X] = () | X => List[X]
+      //val List: Type => Type = X => () | X => List[X]                        // without type constructor
+      //val List: Type => Type = X => ( ( () => Z ) => ( X => List[X] ) => Z ) // without coproduct
+      val Nil: List[X] = ifEmpty => ifList => ifEmpty()
+      val Cons: X => List[X] => List[X] = head => tail => ifEmpty => ifList => ifList(head)(tail)
+    }
+
+    when {
+      val 'id1 : 'Type1
+      val 'id2 : 'Type1
+    }
+    syntax {
+      val 'id0 : List['Type1] = ['id1, 'id2]
+      val 'id3 : List['Type1] = []
+    }
+    replace with {
+      val 'id0 : List['Type1] = Cons('id1, Cons('id2, Nil))
+      val 'id3 : List['Type1] = Nil
+    }
+  }
+
+  syntax HList {
+    provides {
+      val HList: List[Type] => Type = L => L( empty => (() => Z) )( X => Y => (X => HList[Y] => Z) )
+      val HNil: HList[Nil] = f => f()
+      val HCons: X => HList[Y] => HList[Cons(X, Y)] = head => tail => f => f(head)(tail)
+    }
+
+    when {
+      val 'id1 : 'Type1
+      val 'id2 : 'Type2
+    }
+    syntax {
+      // chose < and > because the other grouping character are already in use
+      val 'id0 : <'Type1, 'Type2> = <'id1, 'id2>
+    }
+    replace with {
+      val 'id0 : HList(['Type1, 'Type2]) = HCons('id1, HCons('id2, HNil))
+    }
+  }
+
+  syntax HListExpansion {
+    when {
+      val 'id0 : <'Type1, 'Type2, 'Type3>
+    }
+
+    syntax {
+      <'id1, 'id2, 'id3> = 'id0
+    }
+    replace with {
+      val 'id1 : 'Type1 = 'id0(head => tail => head )
+      val 'id2 : 'Type2 = 'id0(head => tail => tail(head => tail => head))
+      val 'id3 : 'Type2 = 'id0(head => tail => tail(head => tail => tail(head => tail => head)))
+    }
+  }
