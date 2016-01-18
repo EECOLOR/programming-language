@@ -671,3 +671,8 @@ Keyword definition
       val 'id3 : 'Type2 = 'id0(head => tail => tail(head => tail => tail(head => tail => head)))
     }
   }
+
+  include hint for type inference (?, ?) => Map[Int, ?]
+  def f[A, B, C](x: (A, B) => C)  -->  f(y: (?, Int) => ?)
+
+  def f[X <: Int where _

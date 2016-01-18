@@ -1,0 +1,229 @@
+primitive ExpressionTypeAscription {
+  description {
+    The ascription of a type to some expression
+  }
+  syntax {
+    'expression : 'Type
+  }
+  inference {
+    'expression => 'Type
+  }
+}
+
+primitive IdentifierTypeAscription {
+  description {
+    The ascription of a type to some identifier
+  }
+  syntax {
+    'id : 'Type
+  }
+  inference {
+    'id => 'Type
+  }
+}
+
+primitive Type {
+  description {
+    Built-in type of types
+  }
+  syntax {
+    Type
+  }
+  type {
+    Type
+  }
+}
+
+primitive UnitType {
+  description {
+    The type of a unit (or empty product, or free)
+  }
+  syntax {
+    ()
+  }
+  type {
+    Type
+  }
+}
+
+primitive Unit {
+  description {
+    The (free) value of Unit
+  }
+  syntax {
+    unit
+  }
+  type {
+    ()
+  }
+}
+
+primitive GroupType {
+  desription {
+    The type of a grouping (or single product)
+  }
+  syntax {
+    ( 'Type )
+  }
+  type {
+    'Type
+  }
+}
+
+primitive Group {
+  description {
+    Grouping an expression
+  }
+  syntax {
+    ( 'expression )
+  }
+  type {
+    *inferType( 'expression )
+  }
+}
+
+primitive FunctionType {
+  description {
+    The type of a function
+  }
+  syntax {
+    'Type1 => 'Type2
+  }
+  type {
+    Type => Type => Type
+  }
+}
+
+primitive Function {
+  description {
+    Definition of a function
+  }
+  syntax {
+    'id => 'expression
+  }
+  type {
+    *inferType( 'id ) => *inferType( 'expression )
+  }
+}
+
+primitive FunctionApplication {
+  description {
+    Apply a function to a value
+  }
+  syntax {
+    ( 'id => 'expression1 )( 'expression2 )
+  }
+  type {
+    *inferType( 'expression1 )
+  }
+  inference {
+    [ 'id : 'Type ] 'expression2 => 'Type
+    [ 'expression2 : 'Type ] 'id => 'Type
+  }
+}
+
+primitive IdentifierType {
+  description {
+    The type of identifiers
+  }
+  syntax {
+    Identifier
+  }
+  type {
+    Type
+  }
+}
+
+primitive Identifier {
+  description {
+    Creation of an identifier
+  }
+  syntax {
+    'id
+  }
+  type {
+    Identifier
+  }
+}
+
+definition Val {
+  description {
+    Means of abstraction
+  }
+  syntax {
+    val 'id = 'expression
+  }
+  semantics {
+    *[replace outerBody with] ( 'id => *[outerBody without syntax] )( 'expression )
+  }
+}
+
+definition ApplyUnit {
+  description {
+    Syntactic sugar to apply functions where the argument is of unit type
+  }
+  condition {
+    'id : () => 'Type
+  }
+  syntax {
+    'id()
+  }
+  semantics {
+    'id(unit)
+  }
+}
+
+definition ApplyUnitWithoutParentheses {
+  description {
+    Syntactic sugar to apply functions where the argument is of unit type
+  }
+  condition {
+    'id : () => 'Type
+  }
+  syntax {
+    'id
+  }
+  semantics {
+    'id(unit)
+  }
+}
+
+type Product {
+  description {
+    Type of a combination of two or more values
+  }
+  syntax {
+    ( 'id1 , ... , 'idN ) : ( 'Type1 , ... , 'TypeN )
+  }
+  semantics {
+    f : ('Type1 => ... => 'TypeN) => 'Type0 => f('id1)(...)('idN)
+  }
+}
+
+definition  ProductExpansion {
+  description {
+    Syntactic sugar for unpacking products
+  }
+  condition {
+    'id0 : ( 'Type1 , ... , 'TypeN )
+  }
+  syntax {
+    ( 'id1 , ... , 'idN ) = 'id0
+  }
+  semantics {
+    val 'id1 : 'Type1 = 'id0( 'id1 => ... => 'idN => 'id1 )
+    val ...  : ...    = 'id0( 'id1 => ... => 'idN => ...  )
+    val 'idN : 'TypeN = 'id0( 'id1 => ... => 'idN => 'idN )
+  }
+
+definition ApplyProduct {
+  description {
+    Syntactic sugar for calling functions with products
+  }
+  syntax {
+    'id( 'id1 , ... , 'idN )
+  }
+  semantics {
+    ( 'id1 , ... , 'idN )( 'id )
+  }
+}
