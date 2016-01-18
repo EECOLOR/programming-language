@@ -32,49 +32,55 @@ object Parser {
   }
 
     val statement: P[Statement] =
-      P(
-        commentStatement |
-        importStatement  |
-        traitStatement   | objectStatement | classStatement |
-        valStatement     | defStatement    |
-        unimplementedMemberStatement
-      )
+      P( markedStatement | unmarkedStatement )
 
-      val commentStatement =
-        P( "//" ~/ indexed( not("\n") ) ).map(Statement.Comment)
+      val markedStatement =
+        P( NoCut(id) ~ ` ` ~ unmarkedStatement ).map(Statement.Marked)
 
-      val importStatement =
-        P( "import" ~ " " ~/ (importMultiple | importSingle) )
+      val unmarkedStatement =
+        P(
+          commentStatement |
+          importStatement  |
+          traitStatement   | objectStatement | classStatement |
+          valStatement     | defStatement    |
+          unimplementedMemberStatement
+        )
 
-        val importSingle =
-          P( qualifiedReference ).map(Statement.Import.Single)
+          val commentStatement =
+            P( "//" ~/ indexed( not("\n") ) ).map(Statement.Comment)
 
-        val importMultiple =
-          P( qualifiedReference ~ ".{" ~/ ` \n` ~ (importAs | importId).rep(min = 1, commaSeparator) ` \n` "}" ).map(Statement.Import.Multiple)
+          val importStatement =
+            P( "import" ~ " " ~/ (importMultiple | importSingle) )
 
-          val importId =
-            P( id ).map(Statement.Import.Part.Id)
+            val importSingle =
+              P( qualifiedReference ).map(Statement.Import.Single)
 
-          val importAs =
-            P( id ` ` "=>" ` ` id ).map(Statement.Import.Part.As)
+            val importMultiple =
+              P( qualifiedReference ~ ".{" ~/ ` \n` ~ (importAs | importId).rep(min = 1, commaSeparator) ` \n` "}" ).map(Statement.Import.Multiple)
 
-      val traitStatement =
-        P( "trait" ~/ ` ` ~ id ~ (` `.? ~ typeArguments).? ~ (` `.? ~ arguments).? ~ (` ` ~ block).? ).map(Statement.Trait)
+              val importId =
+                P( id ).map(Statement.Import.Part.Id)
 
-      val objectStatement =
-        P( "object" ~ ` ` ~/ id ~ (` ` ~ block).? ).map(Statement.Object)
+              val importAs =
+                P( id ` ` "=>" ` ` id ).map(Statement.Import.Part.As)
 
-      val classStatement =
-        P( "class" ~ ` ` ~/ id ~ (` `.? ~ typeArguments).? ~ ` `.? ~ arguments ).map(Statement.Class)
+          val traitStatement =
+            P( "trait" ~/ ` ` ~ id ~ (` `.? ~ typeArguments).? ~ (` `.? ~ arguments).? ~ (` ` ~ block).? ).map(Statement.Trait)
 
-      val valStatement =
-        P( "val" ~ ` ` ~/ optionalTyped(id ~ (` `.? ~ typeArguments).?) ` ` "=" ` \n` expression).map(Statement.Val)
+          val objectStatement =
+            P( "object" ~ ` ` ~/ id ~ (` ` ~ block).? ).map(Statement.Object)
 
-      val defStatement =
-        P( "def" ~ ` ` ~/ optionalTyped(id ~/ (` `.? ~ typeArguments).? ~ (` `.? ~ arguments).?) ` ` "=" ~ `  ` ~ expression).map(Statement.Def)
+          val classStatement =
+            P( "class" ~ ` ` ~/ id ~ (` `.? ~ typeArguments).? ~ ` `.? ~ arguments ).map(Statement.Class)
 
-      val unimplementedMemberStatement =
-        P( typed(NoCut(id ~ (` `.? ~ typeArguments).? ~ (` `.? ~ arguments).?)) ).map(Statement.UnimplementedMember)
+          val valStatement =
+            P( "val" ~ ` ` ~/ optionalTyped(id ~ (` `.? ~ typeArguments).?) ` ` "=" ` \n` expression).map(Statement.Val)
+
+          val defStatement =
+            P( "def" ~ ` ` ~/ optionalTyped(id ~/ (` `.? ~ typeArguments).? ~ (` `.? ~ arguments).?) ` ` "=" ~ `  ` ~ expression).map(Statement.Def)
+
+          val unimplementedMemberStatement =
+            P( typed(NoCut(id ~ (` `.? ~ typeArguments).? ~ (` `.? ~ arguments).?)) ).map(Statement.UnimplementedMember)
 
     val expression: P[Expression] =
       P( functionExpression | noFunctionExpression )
@@ -124,16 +130,19 @@ object Parser {
   val legalInId =
     P( not(illegalInId) )
 
-  val id =
-    P( indexed( !keyword ~ legalInId ) ).map(Core.Id)
+  val id = {
+   import AlternativeParserBehavior.OrToEither
+
+   val literal = indexed( !keyword ~ legalInId )
+
+    P( literal | literalGroup ).map(Core.Id)
+  }
 
   val qualifiedId =
     P( id.rep(min = 1, sep = "." ) ).map(Core.QualifiedId)
 
   val reference: P[Core.Reference] = {
-    import AlternativeParserBehavior.OrToEither
-
-    P( (id | literalGroup) ~  typeApplication.? ).map(Core.Reference)
+    P( id ~  typeApplication.? ).map(Core.Reference)
   }
 
   val literalGroup =

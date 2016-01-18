@@ -5,6 +5,8 @@ object Statement {
 
   import Core._
 
+  case class Marked(mark: Id, statement: Statement) extends Statement
+
   case class Comment(comment: Indexed) extends Statement
 
   trait Import extends Statement
@@ -27,4 +29,6 @@ object Statement {
   case class Val(id: Typed[(Id, Option[Arguments])], body: Expression) extends Statement
 
   case class UnimplementedMember(signature: Typed[(Id, Option[Arguments], Option[Arguments])]) extends Statement
+
+  type |[+A, +B] = Either[A, B]
 }
