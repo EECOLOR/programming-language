@@ -27,6 +27,7 @@ object Statement {
 
   case class Def(signature: Typed[(Id, Option[Arguments], Option[Arguments])], body: Expression) extends Statement
   case class Val(id: Typed[(Id, Option[Arguments])], body: Expression) extends Statement
+  case class TypeConstructor(id: Id, typeArguments: Arguments, body: Expression) extends Statement
 
   case class UnimplementedMember(signature: Typed[(Id, Option[Arguments], Option[Arguments])]) extends Statement
 

@@ -2,6 +2,11 @@ package syntax
 
 import fastparse.all._
 
+/*
+ * Statements vs Expressions
+ * Declaration vs Invocation
+ * Types vs Values
+ */
 object Parser {
 
   import Whitespace._
@@ -19,7 +24,7 @@ object Parser {
 
   val literalGroups = Seq("\"\"", "`", "\"", "'")
   val illegalInId   = "{}() \n.,:[]" + literalGroups.mkString
-  val keywords      = Seq("package", "import", "object", "trait", "class", "val", "def", "//", "=")
+  val keywords      = Seq("package", "import", "object", "trait", "class", "val", "def", "let", "//", "=")
   val groupEscape   = "\\"
 
   val scalalight =
@@ -42,7 +47,7 @@ object Parser {
           commentStatement |
           importStatement  |
           traitStatement   | objectStatement | classStatement |
-          valStatement     | defStatement    |
+          valStatement     | defStatement    | letStatement   |
           unimplementedMemberStatement
         )
 
@@ -79,6 +84,9 @@ object Parser {
           val defStatement =
             P( "def" ~ ` ` ~/ optionalTyped(id ~/ (` `.? ~ typeArguments).? ~ (` `.? ~ arguments).?) ` ` "=" ~ `  ` ~ expression).map(Statement.Def)
 
+          val letStatement =
+            P( "let" ~ ` ` ~/ id ~ typeArguments ` ` "=" ` \n` expression ).map(Statement.TypeConstructor)
+
           val unimplementedMemberStatement =
             P( typed(NoCut(id ~ (` `.? ~ typeArguments).? ~ (` `.? ~ arguments).?)) ).map(Statement.UnimplementedMember)
 
@@ -110,7 +118,7 @@ object Parser {
           val blockFunctionExpression = {
             import AlternativeParserBehavior.OrToEither
 
-            P("{" ` ` (NoCut(arguments) | NoCut(optionalTyped(id))) ` ` "=>" ~ ` \n` ~/ body ~ ` \n` ~ "}").map(Expression.BlockFunction)
+            P("{" ` ` (NoCut(arguments) | NoCut(optionalTyped(id))) ` ` "=>" ~ ` \n` ~/ body ~ ` \n`.? ~ "}").map(Expression.BlockFunction)
           }
 
           val blockExpression =
@@ -189,7 +197,7 @@ object Parser {
     P( ` \n`.? ~ "," ~/ ` \n` )
 
   val typeAscription =
-    P( ` `.? ~ ":" ~/ ` ` ~ expression )
+    P( ` `.? ~ ":" ~/ ` ` ~ noFunctionExpression )
 
   val typeArguments =
     P( "[" ~/ ` \n`.? ~ argument.rep(sep = commaSeparator) ~ ` \n`.? ~ "]" ).map(Core.Arguments)
