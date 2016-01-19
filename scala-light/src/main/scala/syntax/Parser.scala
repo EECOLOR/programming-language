@@ -99,12 +99,19 @@ object Parser {
           P( ` ` ~ reference ~ `  ` ~/ noWhitespaceApplicationExpression ).map(Expression.WhitespaceApplication(e, _))
 
         val noWhitespaceApplicationExpression: P[Expression] =
-          P( blockExpression | referenceExpression | productExpression )
+          P( blockFunctionExpression | blockExpression | referenceExpression | productExpression )
             .maybeFollowedBy(
               memberAccessExpression,
               productApplicationExpression,
+              blockFunctionApplicationExpression,
               blockApplicationExpression
             )
+
+          val blockFunctionExpression = {
+            import AlternativeParserBehavior.OrToEither
+
+            P("{" ` ` (NoCut(arguments) | NoCut(optionalTyped(id))) ` ` "=>" ~ ` \n` ~/ body ~ ` \n` ~ "}").map(Expression.BlockFunction)
+          }
 
           val blockExpression =
             P( block ).map(Expression.Block)
@@ -117,6 +124,9 @@ object Parser {
 
           def productApplicationExpression(e: Expression) =
             P( ` `.? ~ productExpression ).map(Expression.ProductApplication(e, _))
+
+          def blockFunctionApplicationExpression(e: Expression) =
+            P(` `.? ~ blockFunctionExpression ).map(Expression.BlockFunctionApplication(e, _))
 
           def blockApplicationExpression(e: Expression) =
             P( ` `.? ~ blockExpression ).map(Expression.BlockApplication(e, _))
