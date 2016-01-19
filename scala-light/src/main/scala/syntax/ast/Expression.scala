@@ -9,7 +9,7 @@ object Expression {
   case class BlockApplication(target: Expression, argument: Block) extends Expression
   case class BlockFunction(argument: Arguments | Typed[Id], body: Body) extends Expression
   case class BlockFunctionApplication(target: Expression, argument: BlockFunction) extends Expression
-  case class Function(argument: Arguments | Typed[Id] | Product, body: Expression) extends Expression
+  case class Function(argument: Arguments | Typed[Id], body: Expression) extends Expression
   case class MarkedLiteralGroup(mark: Indexed, literalGroup: LiteralGroup) extends Expression
   case class MemberAccess(expression: Expression, member: QualifiedReference) extends Expression
   case class Product(expressions: Seq[(Option[Id], Expression)]) extends Expression

@@ -96,7 +96,7 @@ object Parser {
       val functionExpression = {
         import AlternativeParserBehavior.OrToEither
 
-        P( (NoCut(arguments) | NoCut(optionalTyped(id)) | NoCut(productExpression)) ` ` "=>" ~ `  ` ~/ expression ).map(Expression.Function)
+        P( (NoCut(arguments) | NoCut(optionalTyped(id))) ` ` "=>" ~ `  ` ~/ expression ).map(Expression.Function)
       }
 
       val noFunctionExpression: P[Expression] =
