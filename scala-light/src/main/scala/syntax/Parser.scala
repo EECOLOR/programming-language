@@ -99,7 +99,7 @@ object Parser {
           P( ` ` ~ reference ~ `  ` ~/ noWhitespaceApplicationExpression ).map(Expression.WhitespaceApplication(e, _))
 
         val noWhitespaceApplicationExpression: P[Expression] =
-          P( blockFunctionExpression | blockExpression | referenceExpression | productExpression )
+          P( blockFunctionExpression | blockExpression | markedLiteralGroup | referenceExpression | productExpression )
             .maybeFollowedBy(
               memberAccessExpression,
               productApplicationExpression,
@@ -122,6 +122,9 @@ object Parser {
           val productExpression =
             P( "(" ~/ ` \n`.? ~ ((NoCut(id) ` ` "=" ~ ` \n`.~/).? ~ expression).rep(sep = commaSeparator.~/) ~ ` \n`.? ~ ")" ).map(Expression.Product)
 
+          val markedLiteralGroup =
+            P( NoCut(literal) ~ literalGroup).map(Expression.MarkedLiteralGroup)
+
           def productApplicationExpression(e: Expression) =
             P( ` `.? ~ productExpression ).map(Expression.ProductApplication(e, _))
 
@@ -143,10 +146,12 @@ object Parser {
   val id = {
    import AlternativeParserBehavior.OrToEither
 
-   val literal = indexed( !keyword ~ legalInId )
 
     P( literal | literalGroup ).map(Core.Id)
   }
+
+  val literal =
+    P( indexed( !keyword ~ legalInId ) )
 
   val qualifiedId =
     P( id.rep(min = 1, sep = "." ) ).map(Core.QualifiedId)
