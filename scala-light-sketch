@@ -616,11 +616,56 @@ Keyword definition
   syntax List {
 
     provides {
+
+
+      Definitions:
+      - Product `(A, B)` implemented as `(A => B => C) => C`
+      - Coproduct `A | B`  implemented as `(A => C) => (B => C) => C`
+      - Type constructor `let Type0[Type1] = Type2` implemented as `val Type0: Type => Type = Type1 => Type2`
+
+      1.
+      ```
       let List[X] = () | X => List[X]
-      //val List: Type => Type = X => () | X => List[X]                        // without type constructor
-      //val List: Type => Type = X => ( ( () => Z ) => ( X => List[X] ) => Z ) // without coproduct
+      // val List: Type => Type = X => () | X => List(X)                        // without type constructor
+      // val List: Type => Type = X => ( ( () => Z ) => ( X => List(X) ) => Z ) // without coproduct
       val Nil: List[X] = ifEmpty => ifList => ifEmpty()
       val Cons: X => List[X] => List[X] = head => tail => ifEmpty => ifList => ifList(head)(tail)
+      ```
+
+      2.
+      ```
+      let List[A] = () | (X, List[X])
+      // val List: Type => Type = X => () | (X, List(X))                                           // without type constructor
+      // val List: Type => Type = X => ( () | (X => List(X) => Y) => Y ) )                         // without product
+      // val List: Type => Type = X => ( ( () => Z ) => ( ((X => List(X) => Y) => Y) => Z ) => Z ) // without coproduct
+      val Nil: List[X] = ifEmpty => ifList => ifEmpty()
+      val Cons: X => List[X] => List[X] = head => tail => ifEmpty => ifList => ifList(ifList => ifList(ifList => ifList(head)(tail)))
+      ```
+
+      3.
+      ```
+      trait List[X] {
+        def fold(ifEmpty: () => Z, ifTail: (X, List[X]) => Z): Z
+      }
+      object Nil extends List[X] {
+        def fold(ifEmpty: () => Z, ifList: (X, List[X]) => Z): Z = ifEmpty()
+      }
+      class Cons(head: X, tail: List[X]) extends List[X] {
+         def fold(ifEmpty: () => Z, ifList: (X, List[X]) => Z): Z = ifList(head, tail)
+      }
+      ```
+
+      4.
+      ```
+      trait List[X]
+      object Nil extends List[X]
+      class Cons(head: X, tail: List[X]) extends List[X]
+
+      list match {
+        case Nil => ...
+        case Cons(head, tail) => ...
+      }
+      ```
     }
 
     when {
