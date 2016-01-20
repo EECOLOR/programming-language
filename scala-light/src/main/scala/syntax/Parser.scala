@@ -22,7 +22,7 @@ object Parser {
 
   import parserEnhancements._
 
-  val literalGroups = Seq("\"\"", "`", "\"", "'")
+  val literalGroups = Seq("\"\"\"", "`", "\"", "'")
   val illegalInId   = "{}() \n.,:[]" + literalGroups.mkString
   val keywords      = Seq("package", "import", "object", "trait", "class", "val", "def", "let", "//", "=")
   val groupEscape   = "\\"
@@ -70,13 +70,13 @@ object Parser {
                 P( id ` ` "=>" ` ` id ).map(Statement.Import.Part.As)
 
           val traitStatement =
-            P( "trait" ~/ ` ` ~ id ~ (` `.? ~ typeArguments).? ~ (` `.? ~ arguments).? ~ (` ` ~ block).? ).map(Statement.Trait)
+            P( "trait" ~/ ` ` ~ id ~ (` `.? ~ typeArguments).? ~ (` `.? ~ arguments).? ~ extensions ~(` ` ~ block).? ).map(Statement.Trait)
 
           val objectStatement =
-            P( "object" ~ ` ` ~/ id ~ (` ` ~ block).? ).map(Statement.Object)
+            P( "object" ~ ` ` ~/ id ~ (` `.? ~ typeArguments).? ~ extensions ~ (` ` ~ block).? ).map(Statement.Object)
 
           val classStatement =
-            P( "class" ~ ` ` ~/ id ~ (` `.? ~ typeArguments).? ~ ` `.? ~ arguments ).map(Statement.Class)
+            P( "class" ~ ` ` ~/ id ~ (` `.? ~ typeArguments).? ~ ` `.? ~ arguments ~ extensions ~ (` ` ~ block).? ).map(Statement.Class)
 
           val valStatement =
             P( "val" ~ ` ` ~/ optionalTyped(id ~ (` `.? ~ typeArguments).?) ` ` "=" ` \n` expression).map(Statement.Val)
@@ -144,6 +144,12 @@ object Parser {
 
           def memberAccessExpression(e: Expression) =
             P( `  `.? ~ "." ~/ qualifiedReference ).map(Expression.MemberAccess(e, _))
+
+  val extensions =
+    P( extension.rep )
+
+  val extension =
+    P( `  ` ~ id ~ `  ` ~ (productExpression | referenceExpression.maybeFollowedBy(productApplicationExpression)).? ).map(Core.Extension)
 
   val keyword =
     P( StringIn(keywords: _*) ~ !legalInId )

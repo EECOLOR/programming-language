@@ -18,9 +18,9 @@ class ParserEnhancements(
     def separatedBy[B](parser: Parser[B]) =
       a.rep(sep = parser)
 
-    def maybeFollowedBy(parsers: A => Parser[A] *) =
+    def maybeFollowedBy[B >: A](parsers: B => Parser[B] *) =
       a.flatMap { a =>
-          def initParser(a: A): Parser[A] = parsers.map(_ apply a).reduce(_ | _).flatMap(a => initParser(a) | Pass.map(_ => a))
+          def initParser(a: B): Parser[B] = parsers.map(_ apply a).reduce(_ | _).flatMap(a => initParser(a) | Pass.map(_ => a))
           val result = initParser(a)
 
           result | Pass.map(_ => a)

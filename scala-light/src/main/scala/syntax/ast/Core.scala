@@ -7,6 +7,7 @@ object Core {
   case class Arguments(arguments: Seq[Argument]) extends Core
   case class Block(body: Option[Body]) extends Core
   case class Body(body: Seq[Statement | Expression]) extends Core
+  case class Extension(id: Id, expression: Option[Expression]) extends Core
   case class Id(value: Indexed | LiteralGroup) extends Core
   case class Indexed(index: Int, value: String) extends Core
   case class LiteralGroup(literal: String, value: Indexed) extends Core

@@ -21,9 +21,9 @@ object Statement {
     }
   }
 
-  case class Class(name: Id, typeArguments: Option[Arguments], arguments: Arguments) extends Statement
-  case class Object(name: Id, body: Option[Block]) extends Statement
-  case class Trait(name: Id, typeArguments: Option[Arguments], arguments: Option[Arguments], body: Option[Block]) extends Statement
+  case class Class(name: Id, typeArguments: Option[Arguments], arguments: Arguments, extensions: Seq[Extension], body: Option[Block]) extends Statement
+  case class Object(name: Id, typeArguments: Option[Arguments], extensions: Seq[Extension], body: Option[Block]) extends Statement
+  case class Trait(name: Id, typeArguments: Option[Arguments], arguments: Option[Arguments], extensions: Seq[Extension], body: Option[Block]) extends Statement
 
   case class Def(signature: Typed[(Id, Option[Arguments], Option[Arguments])], body: Expression) extends Statement
   case class Val(id: Typed[(Id, Option[Arguments])], body: Expression) extends Statement
