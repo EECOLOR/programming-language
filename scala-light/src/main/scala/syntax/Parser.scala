@@ -48,7 +48,7 @@ object Parser {
           importStatement  |
           traitStatement   | objectStatement | classStatement |
           valStatement     | defStatement    | letStatement   |
-          unimplementedMemberStatement
+          memberExtraction | unimplementedMemberStatement
         )
 
           val commentStatement =
@@ -89,6 +89,9 @@ object Parser {
 
           val unimplementedMemberStatement =
             P( typed(NoCut(id ~ (` `.? ~ typeArguments).? ~ (` `.? ~ arguments).?)) ).map(Statement.UnimplementedMember)
+
+          val memberExtraction =
+            P( NoCut(qualifiedReference.?) ~ ` `.? ~ "(" ~ `  `.? ~ NoCut(id.rep(min = 1, commaSeparator)) ~ `  `.? ~ ")" ` ` "=" ~ `  ` ~/  expression).map(Statement.MemberExtraction)
 
     val expression: P[Expression] =
       P( functionExpression | noFunctionExpression )

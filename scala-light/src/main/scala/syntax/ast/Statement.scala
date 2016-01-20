@@ -31,5 +31,7 @@ object Statement {
 
   case class UnimplementedMember(signature: Typed[(Id, Option[Arguments], Option[Arguments])]) extends Statement
 
+  case class MemberExtraction(target: Option[QualifiedReference], members: Seq[Id], expression: Expression) extends Statement
+
   type |[+A, +B] = Either[A, B]
 }
