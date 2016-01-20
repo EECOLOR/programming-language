@@ -185,7 +185,7 @@ object Parser {
   }
 
   val typeApplication =
-    P( "[" ~/ ` \n`.? ~ qualifiedReference.rep(min = 1, commaSeparator) ~ ` \n`.? ~ "]" ).map(Core.TypeApplication)
+    P( "[" ~/ ` \n`.? ~ expression.rep(min = 1, commaSeparator) ~ ` \n`.? ~ "]" ).map(Core.TypeApplication)
 
   val qualifiedReference =
     P( reference.rep(min = 1, sep = "." ) ).map(Core.QualifiedReference)

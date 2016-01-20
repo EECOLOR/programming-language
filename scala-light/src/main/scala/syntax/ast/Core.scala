@@ -15,7 +15,7 @@ object Core {
   case class QualifiedId(value: Seq[Id]) extends Core
   case class QualifiedReference(value: Seq[Reference]) extends Core
   case class Reference(to: Id, typeApplication: Option[TypeApplication]) extends Core
-  case class TypeApplication(arguments: Seq[QualifiedReference]) extends Core
+  case class TypeApplication(arguments: Seq[Expression]) extends Core
   case class Typed[A](expression: A, `type`: Option[Expression]) extends Core
 
   type |[+A, +B] = Either[A, B]
