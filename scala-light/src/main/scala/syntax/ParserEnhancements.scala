@@ -2,6 +2,7 @@ package syntax
 
 import fastparse.all._
 import fastparse.Implicits.Sequencer
+import fastparse.core.ParseCtx
 
 class ParserEnhancements(
   whitespace        : => P[Unit],
@@ -9,21 +10,40 @@ class ParserEnhancements(
   spacesSingleBreak : => P[Unit]
 ) {
 
-  implicit class CustomParserOperations[X, A](a: X)(implicit x: X => Parser[A]) {
+  implicit class CustomParserOperations[X, A](parser: X)(implicit x: X => Parser[A]) {
 
-    def ` \n` [B, C](b: Parser[B])(implicit ev: Sequencer[A, B, C]) = a ~ whitespace ~ b
-    def ` `   [B, C](b: Parser[B])(implicit ev: Sequencer[A, B, C]) = a ~ spaces ~ b
-    def `  `  [B, C](b: Parser[B])(implicit ev: Sequencer[A, B, C]) = a ~ spacesSingleBreak ~ b
+    def ` \n` [B, C](other: Parser[B])(implicit ev: Sequencer[A, B, C]) = parser ~ whitespace ~ other
+    def ` `   [B, C](other: Parser[B])(implicit ev: Sequencer[A, B, C]) = parser ~ spaces ~ other
+    def `  `  [B, C](other: Parser[B])(implicit ev: Sequencer[A, B, C]) = parser ~ spacesSingleBreak ~ other
 
-    def separatedBy[B](parser: Parser[B]) =
-      a.rep(sep = parser)
+    class * extends Parser[Seq[A]] {
+      def parseRec(cfg: ParseCtx, index: Int) =
+        parser.rep.parseRec(cfg, index)
 
-    def maybeFollowedBy[B >: A](parsers: B => Parser[B] *) =
-      a.flatMap { a =>
-          def initParser(a: B): Parser[B] = parsers.map(_ apply a).reduce(_ | _).flatMap(a => initParser(a) | Pass.map(_ => a))
-          val result = initParser(a)
+      def separatedBy[B](separator: Parser[B]): Parser[Seq[A]] =
+        parser.rep(sep = separator)
+    }
+    object * extends *
 
-          result | Pass.map(_ => a)
-        }
+    class + extends Parser[Seq[A]] {
+      def parseRec(cfg: ParseCtx, index: Int) =
+        parser.rep(min = 1).parseRec(cfg, index)
+
+      def separatedBy[B](separator: Parser[B]): Parser[Seq[A]] =
+        parser.rep(min = 1, sep = separator)
+    }
+    object + extends +
+
+    def maybeFollowedBy[B >: A](parsers: B => Parser[B] *) = {
+
+      def chainParsers(b: B): Parser[B] = {
+        val initializedParsers = parsers.map(_ apply b)
+        val combinedParsers = initializedParsers.reduce(_ | _)
+        val chainedParsers = combinedParsers.flatMap(chainParsers)
+        chainedParsers | Pass.map(_ => b)
+      }
+
+      parser.flatMap(chainParsers)
+    }
   }
 }

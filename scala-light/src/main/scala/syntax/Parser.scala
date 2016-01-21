@@ -1,13 +1,15 @@
 package syntax
 
 import fastparse.all._
-
 /*
  * Statements vs Expressions
  * Declaration vs Invocation
  * Types vs Values
  */
 object Parser {
+
+  // shadow predef
+  val any2stringadd = null
 
   import Separators._
   import ParserUtilities._
@@ -35,28 +37,28 @@ object Parser {
         import expressions.expression
         import AlternativeParserBehavior.OrToEither
 
-        P( (statement | expression).separatedBy(`\n`) ).map(Body)
+        P( (statement | expression).* separatedBy `\n` ).map(Body)
       }
 
-     val extension = {
+    val extension = {
       import expressions.productExpression
       import expressions.referenceExpression
       import expressions.productApplicationExpression
 
-      P( `  ` ~ id ~ `  ` ~ (productExpression | referenceExpression.maybeFollowedBy(productApplicationExpression)).? ).map(Extension)
+      P( `  ` ~ id ~ `  ` ~ ((productExpression | referenceExpression) maybeFollowedBy productApplicationExpression).? ).map(Extension)
     }
 
     val typeApplication = {
       import expressions.expression
 
-      P( "[" ~/ ` \n`.? ~ expression.rep(min = 1, `,`) ~ ` \n`.? ~ "]" ).map(TypeApplication)
+      P( "[" ~/ ` \n`.? ~ (expression.+ separatedBy `,`) ~ ` \n`.? ~ "]" ).map(TypeApplication)
     }
 
     val reference =
       P( id ~  typeApplication.? ).map(Reference)
 
     val qualifiedReference =
-      P( reference.rep(min = 1, sep = "." ) ).map(QualifiedReference)
+      P( reference.+ separatedBy "." ).map(QualifiedReference)
 
     val block =
       P( "{" ~/ (` \n` ~ body ~ ` \n`).? ~ "}" ).map(Block)
@@ -68,7 +70,7 @@ object Parser {
       arguments("[", "]")
 
     def arguments(`<`: String, `>`: String) =
-      P( `<` ~/ ` \n`.? ~ argument.rep(sep = `,`) ~ ` \n`.? ~ `>` ).map(Arguments)
+      P( `<` ~/ ` \n`.? ~ (argument.* separatedBy `,`) ~ ` \n`.? ~ `>` ).map(Arguments)
 
     val argument = {
       import expressions.expression
@@ -91,12 +93,12 @@ object Parser {
     }
 
     val qualifiedId =
-      P( id.rep(min = 1, sep = "." ) ).map(QualifiedId)
+      P( id.+ separatedBy "." ).map(QualifiedId)
 
     val literalGroup = {
       def toLiteralGroupParser(c: String) = {
         val escaped = (groupEscape ~ (c | groupEscape).!) | groupEscape.!
-        val group   = (not(c + groupEscape) | escaped).rep.map(_.mkString)
+        val group   = (not(c + groupEscape) | escaped).*.map(_.mkString)
 
         (c ~/ indexed( group ) ~ c).map(Core.LiteralGroup(c, _))
       }
@@ -164,7 +166,7 @@ object Parser {
 
     val importMultiple = {
       import cores.qualifiedReference
-      P( qualifiedReference ~ ".{" ~/ ` \n` ~ (importAs | importId).rep(min = 1, `,`) ` \n` "}" ).map(Import.Multiple)
+      P( qualifiedReference ~ ".{" ~/ ` \n` ~ ((importAs | importId).+ separatedBy `,`) ` \n` "}" ).map(Import.Multiple)
     }
 
     val importId = {
@@ -186,7 +188,7 @@ object Parser {
       import cores.extension
       import cores.id
 
-      P( "trait" ~/ ` ` ~ id ~ (` `.? ~ typeArguments).? ~ (` `.? ~ valueArguments).? ~ extension.rep ~(` ` ~ block).? ).map(Statement.Trait)
+      P( "trait" ~/ ` ` ~ id ~ (` `.? ~ typeArguments).? ~ (` `.? ~ valueArguments).? ~ extension.* ~(` ` ~ block).? ).map(Statement.Trait)
     }
 
     val objectStatement = {
@@ -195,7 +197,7 @@ object Parser {
       import cores.extension
       import cores.id
 
-      P( "object" ~ ` ` ~/ id ~ (` `.? ~ typeArguments).? ~ extension.rep ~ (` ` ~ block).? ).map(Statement.Object)
+      P( "object" ~ ` ` ~/ id ~ (` `.? ~ typeArguments).? ~ extension.* ~ (` ` ~ block).? ).map(Statement.Object)
     }
 
     val classStatement = {
@@ -205,7 +207,7 @@ object Parser {
       import cores.extension
       import cores.id
 
-      P( "class" ~ ` ` ~/ id ~ (` `.? ~ typeArguments).? ~ ` `.? ~ valueArguments ~ extension.rep ~ (` ` ~ block).? ).map(Statement.Class)
+      P( "class" ~ ` ` ~/ id ~ (` `.? ~ typeArguments).? ~ ` `.? ~ valueArguments ~ extension.* ~ (` ` ~ block).? ).map(Statement.Class)
     }
 
     val valStatement = {
@@ -249,7 +251,7 @@ object Parser {
       import expressions.expression
       import cores.id
 
-      P( NoCut(qualifiedReference.?) ~ ` `.? ~ "(" ~ `  `.? ~ NoCut(id.rep(min = 1, `,`)) ~ `  `.? ~ ")" ` ` "=" ~ `  ` ~/  expression).map(Statement.MemberExtraction)
+      P( NoCut(qualifiedReference.?) ~ ` `.? ~ "(" ~ `  `.? ~ NoCut(id.+ separatedBy `,`) ~ `  `.? ~ ")" ` ` "=" ~ `  ` ~/  expression).map(Statement.MemberExtraction)
     }
   }
 
@@ -313,7 +315,7 @@ object Parser {
     val productExpression = {
       import cores.id
 
-      P( "(" ~/ ` \n`.? ~ ((NoCut(id) ` ` "=" ~ ` \n`.~/).? ~ expression).rep(sep = `,`.~/) ~ ` \n`.? ~ ")" ).map(Product)
+      P( "(" ~/ ` \n`.? ~ (((NoCut(id) ` ` "=" ~ ` \n`.~/).? ~ expression).* separatedBy `,`) ~ ` \n`.? ~ ")" ).map(Product)
     }
 
     val markedLiteralGroup = {
