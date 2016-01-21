@@ -9,7 +9,7 @@ import fastparse.all._
  */
 object Parser {
 
-  import Whitespace._
+  import Separators._
   import ParserUtilities._
   import ast._
 
@@ -27,196 +27,315 @@ object Parser {
   val keywords      = Seq("package", "import", "object", "trait", "class", "val", "def", "let", "//", "=")
   val groupEscape   = "\\"
 
-  val scalalight =
-    P( ("package" ~ " " ~/ qualifiedId ~ ` \n`).? ~ body ~ `\n` ~ End ).map(Core.Package)
+  object cores {
+    import Core._
 
-  val body: P[Core.Body] = {
-    import AlternativeParserBehavior.OrToEither
+    val body = {
+        import statements.statement
+        import expressions.expression
+        import AlternativeParserBehavior.OrToEither
 
-    P( (statement | expression).separatedBy(`\n`) ).map(Core.Body)
+        P( (statement | expression).separatedBy(`\n`) ).map(Body)
+      }
+
+     val extension = {
+      import expressions.productExpression
+      import expressions.referenceExpression
+      import expressions.productApplicationExpression
+
+      P( `  ` ~ id ~ `  ` ~ (productExpression | referenceExpression.maybeFollowedBy(productApplicationExpression)).? ).map(Extension)
+    }
+
+    val typeApplication = {
+      import expressions.expression
+
+      P( "[" ~/ ` \n`.? ~ expression.rep(min = 1, `,`) ~ ` \n`.? ~ "]" ).map(TypeApplication)
+    }
+
+    val reference =
+      P( id ~  typeApplication.? ).map(Reference)
+
+    val qualifiedReference =
+      P( reference.rep(min = 1, sep = "." ) ).map(QualifiedReference)
+
+    val block =
+      P( "{" ~/ (` \n` ~ body ~ ` \n`).? ~ "}" ).map(Block)
+
+    val valueArguments =
+      arguments("(", ")")
+
+    val typeArguments =
+      arguments("[", "]")
+
+    def arguments(`<`: String, `>`: String) =
+      P( `<` ~/ ` \n`.? ~ argument.rep(sep = `,`) ~ ` \n`.? ~ `>` ).map(Arguments)
+
+    val argument = {
+      import expressions.expression
+
+      P( optionalTyped(id) ~ (` ` ~ "=" ~ `  ` ~/ expression).? ).map(Argument)
+    }
+
+    val id = {
+     import AlternativeParserBehavior.OrToEither
+
+
+      P( literal | literalGroup ).map(Id)
+    }
+
+    val literal = {
+      val legalInId = P( not(illegalInId) )
+      val keyword = P( StringIn(keywords: _*) ~ !legalInId )
+
+      P( indexed( !keyword ~ legalInId ) )
+    }
+
+    val qualifiedId =
+      P( id.rep(min = 1, sep = "." ) ).map(QualifiedId)
+
+    val literalGroup = {
+      def toLiteralGroupParser(c: String) = {
+        val escaped = (groupEscape ~ (c | groupEscape).!) | groupEscape.!
+        val group   = (not(c + groupEscape) | escaped).rep.map(_.mkString)
+
+        (c ~/ indexed( group ) ~ c).map(Core.LiteralGroup(c, _))
+      }
+
+      P( literalGroups.map(toLiteralGroupParser).reduce(_ | _) )
+    }
+
+    def optionalTyped[A](p: Parser[A]) =
+      P( p ~ typeAscription.? ).map(Typed[A])
+
+    def typed[A](p: Parser[A]) =
+      P( p ~ typeAscription.map(Option(_)) ).map(Typed[A])
+
+    val typeAscription = {
+      import expressions.noFunctionExpression
+
+      P( ` `.? ~ ":" ~ ` ` ~/ noFunctionExpression )
+    }
+
+    def indexed(p: => Parser[String]) =
+      (Index ~ p).map(Indexed)
   }
+
+  object statements {
+
+    import Statement._
+
+    val `package` = {
+      import cores.body
+      import cores.qualifiedId
+
+      P( ("package" ~ " " ~/ qualifiedId ~ ` \n`).? ~ body ~ `\n` ~ End ).map(Package)
+    }
 
     val statement: P[Statement] =
       P( markedStatement | unmarkedStatement )
 
-      val markedStatement =
-        P( NoCut(id) ~ ` ` ~ unmarkedStatement ).map(Statement.Marked)
+    val markedStatement = {
+      import cores.id
 
-      val unmarkedStatement =
-        P(
-          commentStatement |
-          importStatement  |
-          traitStatement   | objectStatement | classStatement |
-          valStatement     | defStatement    | letStatement   |
-          memberExtraction | unimplementedMemberStatement
-        )
+      P( NoCut(id) ~ ` ` ~ unmarkedStatement ).map(Marked)
+    }
 
-          val commentStatement =
-            P( "//" ~/ indexed( not("\n") ) ).map(Statement.Comment)
+    val unmarkedStatement: P[Statement] =
+      P(
+        traitStatement   | objectStatement | classStatement |
+        valStatement     | defStatement    | letStatement   |
+        commentStatement | importStatement |
+        memberExtraction | unimplementedMemberStatement
+      )
 
-          val importStatement =
-            P( "import" ~ " " ~/ (importMultiple | importSingle) )
+    val commentStatement = {
+      import cores.indexed
 
-            val importSingle =
-              P( qualifiedReference ).map(Statement.Import.Single)
+      P( "//" ~/ indexed( not("\n") ) ).map(Comment)
+    }
 
-            val importMultiple =
-              P( qualifiedReference ~ ".{" ~/ ` \n` ~ (importAs | importId).rep(min = 1, commaSeparator) ` \n` "}" ).map(Statement.Import.Multiple)
+    val importStatement: P[Import] =
+      P( "import" ~ " " ~/ (importMultiple | importSingle) )
 
-              val importId =
-                P( id ).map(Statement.Import.Part.Id)
+    val importSingle = {
+      import cores.qualifiedReference
+      P( qualifiedReference ).map(Import.Single)
+    }
 
-              val importAs =
-                P( id ` ` "=>" ` ` id ).map(Statement.Import.Part.As)
+    val importMultiple = {
+      import cores.qualifiedReference
+      P( qualifiedReference ~ ".{" ~/ ` \n` ~ (importAs | importId).rep(min = 1, `,`) ` \n` "}" ).map(Import.Multiple)
+    }
 
-          val traitStatement =
-            P( "trait" ~/ ` ` ~ id ~ (` `.? ~ typeArguments).? ~ (` `.? ~ arguments).? ~ extensions ~(` ` ~ block).? ).map(Statement.Trait)
+    val importId = {
+      import cores.id
 
-          val objectStatement =
-            P( "object" ~ ` ` ~/ id ~ (` `.? ~ typeArguments).? ~ extensions ~ (` ` ~ block).? ).map(Statement.Object)
+      P( id ).map(Import.Id)
+    }
 
-          val classStatement =
-            P( "class" ~ ` ` ~/ id ~ (` `.? ~ typeArguments).? ~ ` `.? ~ arguments ~ extensions ~ (` ` ~ block).? ).map(Statement.Class)
+    val importAs = {
+      import cores.id
 
-          val valStatement =
-            P( "val" ~ ` ` ~/ optionalTyped(id ~ (` `.? ~ typeArguments).?) ` ` "=" ` \n` expression).map(Statement.Val)
+      P( id ` ` "=>" ` ` id ).map(Import.As)
+    }
 
-          val defStatement =
-            P( "def" ~ ` ` ~/ optionalTyped(id ~/ (` `.? ~ typeArguments).? ~ (` `.? ~ arguments).?) ` ` "=" ~ `  ` ~ expression).map(Statement.Def)
+    val traitStatement = {
+      import cores.typeArguments
+      import cores.valueArguments
+      import cores.block
+      import cores.extension
+      import cores.id
 
-          val letStatement =
-            P( "let" ~ ` ` ~/ id ~ typeArguments ` ` "=" ` \n` expression ).map(Statement.TypeConstructor)
+      P( "trait" ~/ ` ` ~ id ~ (` `.? ~ typeArguments).? ~ (` `.? ~ valueArguments).? ~ extension.rep ~(` ` ~ block).? ).map(Statement.Trait)
+    }
 
-          val unimplementedMemberStatement =
-            P( typed(NoCut(id ~ (` `.? ~ typeArguments).? ~ (` `.? ~ arguments).?)) ).map(Statement.UnimplementedMember)
+    val objectStatement = {
+      import cores.typeArguments
+      import cores.block
+      import cores.extension
+      import cores.id
 
-          val memberExtraction =
-            P( NoCut(qualifiedReference.?) ~ ` `.? ~ "(" ~ `  `.? ~ NoCut(id.rep(min = 1, commaSeparator)) ~ `  `.? ~ ")" ` ` "=" ~ `  ` ~/  expression).map(Statement.MemberExtraction)
+      P( "object" ~ ` ` ~/ id ~ (` `.? ~ typeArguments).? ~ extension.rep ~ (` ` ~ block).? ).map(Statement.Object)
+    }
+
+    val classStatement = {
+      import cores.typeArguments
+      import cores.valueArguments
+      import cores.block
+      import cores.extension
+      import cores.id
+
+      P( "class" ~ ` ` ~/ id ~ (` `.? ~ typeArguments).? ~ ` `.? ~ valueArguments ~ extension.rep ~ (` ` ~ block).? ).map(Statement.Class)
+    }
+
+    val valStatement = {
+      import cores.typeArguments
+      import expressions.expression
+      import cores.id
+      import cores.optionalTyped
+
+      P( "val" ~ ` ` ~/ optionalTyped(id ~ (` `.? ~ typeArguments).?) ` ` "=" ` \n` expression).map(Statement.Val)
+    }
+
+    val defStatement = {
+      import cores.typeArguments
+      import cores.valueArguments
+      import expressions.expression
+      import cores.id
+      import cores.optionalTyped
+
+      P( "def" ~ ` ` ~/ optionalTyped(id ~/ (` `.? ~ typeArguments).? ~ (` `.? ~ valueArguments).?) ` ` "=" ~ `  ` ~ expression).map(Statement.Def)
+    }
+
+    val letStatement = {
+      import cores.typeArguments
+      import expressions.expression
+      import cores.id
+
+      P( "let" ~ ` ` ~/ id ~ typeArguments ` ` "=" ` \n` expression ).map(Statement.TypeConstructor)
+    }
+
+    val unimplementedMemberStatement = {
+      import cores.typeArguments
+      import cores.valueArguments
+      import cores.id
+      import cores.typed
+
+      P( typed(NoCut(id ~ (` `.? ~ typeArguments).? ~ (` `.? ~ valueArguments).?)) ).map(Statement.UnimplementedMember)
+    }
+
+    val memberExtraction = {
+      import cores.qualifiedReference
+      import expressions.expression
+      import cores.id
+
+      P( NoCut(qualifiedReference.?) ~ ` `.? ~ "(" ~ `  `.? ~ NoCut(id.rep(min = 1, `,`)) ~ `  `.? ~ ")" ` ` "=" ~ `  ` ~/  expression).map(Statement.MemberExtraction)
+    }
+  }
+
+  object expressions {
+
+    import Expression._
 
     val expression: P[Expression] =
       P( functionExpression | noFunctionExpression )
 
-      val functionExpression = {
-        import AlternativeParserBehavior.OrToEither
+    val functionExpression = {
+      import cores.valueArguments
+      import cores.id
+      import AlternativeParserBehavior.OrToEither
+      import cores.optionalTyped
 
-        P( (NoCut(arguments) | NoCut(optionalTyped(id))) ` ` "=>" ~ `  ` ~/ expression ).map(Expression.Function)
-      }
+      P( (NoCut(valueArguments) | NoCut(optionalTyped(id))) ` ` "=>" ~ `  ` ~/ expression ).map(Function)
+    }
 
-      val noFunctionExpression: P[Expression] =
-        P( noWhitespaceApplicationExpression )
-          .maybeFollowedBy(whitespaceApplicationExpression)
+    val noFunctionExpression: P[Expression] =
+      P( noWhitespaceApplicationExpression )
+        .maybeFollowedBy(whitespaceApplicationExpression)
 
-        def whitespaceApplicationExpression(e: Expression) =
-          P( ` ` ~ reference ~ `  ` ~/ noWhitespaceApplicationExpression ).map(Expression.WhitespaceApplication(e, _))
+    def whitespaceApplicationExpression(e: Expression) = {
+      import cores.reference
 
-        val noWhitespaceApplicationExpression: P[Expression] =
-          P( blockFunctionExpression | blockExpression | markedLiteralGroup | referenceExpression | productExpression )
-            .maybeFollowedBy(
-              memberAccessExpression,
-              productApplicationExpression,
-              blockFunctionApplicationExpression,
-              blockApplicationExpression
-            )
+      P( ` ` ~ reference ~ `  ` ~/ noWhitespaceApplicationExpression ).map(WhitespaceApplication(e, _))
+    }
 
-          val blockFunctionExpression = {
-            import AlternativeParserBehavior.OrToEither
+    val noWhitespaceApplicationExpression: P[Expression] =
+      P( blockFunctionExpression | blockExpression | markedLiteralGroup | referenceExpression | productExpression )
+        .maybeFollowedBy(
+          memberAccessExpression,
+          productApplicationExpression,
+          blockFunctionApplicationExpression,
+          blockApplicationExpression
+        )
 
-            P("{" ` ` (NoCut(arguments) | NoCut(optionalTyped(id))) ` ` "=>" ~ ` \n` ~/ body ~ ` \n`.? ~ "}").map(Expression.BlockFunction)
-          }
+    val blockFunctionExpression = {
+      import cores.valueArguments
+      import cores.body
+      import AlternativeParserBehavior.OrToEither
+      import cores.id
+      import cores.optionalTyped
 
-          val blockExpression =
-            P( block ).map(Expression.Block)
+      P("{" ` ` (NoCut(valueArguments) | NoCut(optionalTyped(id))) ` ` "=>" ~ ` \n` ~/ body ~ ` \n`.? ~ "}").map(BlockFunction)
+    }
 
-          val referenceExpression =
-            P( qualifiedReference ).map(Expression.Reference)
+    val blockExpression = {
+      import cores.block
 
-          val productExpression =
-            P( "(" ~/ ` \n`.? ~ ((NoCut(id) ` ` "=" ~ ` \n`.~/).? ~ expression).rep(sep = commaSeparator.~/) ~ ` \n`.? ~ ")" ).map(Expression.Product)
+      P( block ).map(Block)
+    }
 
-          val markedLiteralGroup =
-            P( NoCut(literal) ~ literalGroup).map(Expression.MarkedLiteralGroup)
+    val referenceExpression = {
+      import cores.qualifiedReference
 
-          def productApplicationExpression(e: Expression) =
-            P( ` `.? ~ productExpression ).map(Expression.ProductApplication(e, _))
+      P( qualifiedReference ).map(Reference)
+    }
 
-          def blockFunctionApplicationExpression(e: Expression) =
-            P(` `.? ~ blockFunctionExpression ).map(Expression.BlockFunctionApplication(e, _))
+    val productExpression = {
+      import cores.id
 
-          def blockApplicationExpression(e: Expression) =
-            P( ` `.? ~ blockExpression ).map(Expression.BlockApplication(e, _))
+      P( "(" ~/ ` \n`.? ~ ((NoCut(id) ` ` "=" ~ ` \n`.~/).? ~ expression).rep(sep = `,`.~/) ~ ` \n`.? ~ ")" ).map(Product)
+    }
 
-          def memberAccessExpression(e: Expression) =
-            P( `  `.? ~ "." ~/ qualifiedReference ).map(Expression.MemberAccess(e, _))
+    val markedLiteralGroup = {
+      import cores.literal
+      import cores.literalGroup
 
-  val extensions =
-    P( extension.rep )
+      P( NoCut(literal) ~ literalGroup).map(MarkedLiteralGroup)
+    }
 
-  val extension =
-    P( `  ` ~ id ~ `  ` ~ (productExpression | referenceExpression.maybeFollowedBy(productApplicationExpression)).? ).map(Core.Extension)
+    def productApplicationExpression(e: Expression) =
+      P( ` `.? ~ productExpression ).map(ProductApplication(e, _))
 
-  val keyword =
-    P( StringIn(keywords: _*) ~ !legalInId )
+    def blockFunctionApplicationExpression(e: Expression) =
+      P(` `.? ~ blockFunctionExpression ).map(BlockFunctionApplication(e, _))
 
-  val legalInId =
-    P( not(illegalInId) )
+    def blockApplicationExpression(e: Expression) =
+      P( ` `.? ~ blockExpression ).map(Expression.BlockApplication(e, _))
 
-  val id = {
-   import AlternativeParserBehavior.OrToEither
+    def memberAccessExpression(e: Expression) = {
+      import cores.qualifiedReference
 
-
-    P( literal | literalGroup ).map(Core.Id)
+      P( `  `.? ~ "." ~/ qualifiedReference ).map(MemberAccess(e, _))
+    }
   }
-
-  val literal =
-    P( indexed( !keyword ~ legalInId ) )
-
-  val qualifiedId =
-    P( id.rep(min = 1, sep = "." ) ).map(Core.QualifiedId)
-
-  val reference: P[Core.Reference] = {
-    P( id ~  typeApplication.? ).map(Core.Reference)
-  }
-
-  val literalGroup =
-    P( literalGroups.map(toLiteralGroupParser).reduce(_ | _) )
-
-  def toLiteralGroupParser(c: String) = {
-    val escaped = (groupEscape ~ (c | groupEscape).!) | groupEscape.!
-    val group   = (not(c + groupEscape) | escaped).rep.map(_.mkString)
-
-    (c ~/ indexed( group ) ~ c).map(Core.LiteralGroup(c, _))
-  }
-
-  val typeApplication =
-    P( "[" ~/ ` \n`.? ~ expression.rep(min = 1, commaSeparator) ~ ` \n`.? ~ "]" ).map(Core.TypeApplication)
-
-  val qualifiedReference =
-    P( reference.rep(min = 1, sep = "." ) ).map(Core.QualifiedReference)
-
-  val block =
-    P( "{" ~/ (` \n` ~ body ~ ` \n`).? ~ "}" ).map(Core.Block)
-
-  val arguments =
-    P( "(" ~/ ` \n`.? ~ argument.rep(sep = commaSeparator) ~ ` \n`.? ~ ")" ).map(Core.Arguments)
-
-  val argument =
-    P( optionalTyped(id) ~ (` ` ~ "=" ~ `  ` ~/ expression).? ).map(Core.Argument)
-
-  val commaSeparator =
-    P( ` \n`.? ~ "," ~/ ` \n` )
-
-  val typeAscription =
-    P( ` `.? ~ ":" ~/ ` ` ~ noFunctionExpression )
-
-  val typeArguments =
-    P( "[" ~/ ` \n`.? ~ argument.rep(sep = commaSeparator) ~ ` \n`.? ~ "]" ).map(Core.Arguments)
-
-  def optionalTyped[A](p: Parser[A]) =
-    P( p ~ typeAscription.? ).map(Core.Typed[A])
-
-  def typed[A](p: Parser[A]) =
-    P( p ~ typeAscription.map(Option(_)) ).map(Core.Typed[A])
-
-  def indexed(p: => Parser[String]) =
-    (Index ~ p).map(Core.Indexed)
 }

@@ -11,7 +11,6 @@ object Core {
   case class Id(value: Indexed | LiteralGroup) extends Core
   case class Indexed(index: Int, value: String) extends Core
   case class LiteralGroup(literal: String, value: Indexed) extends Core
-  case class Package(path: Option[QualifiedId], body: Body) extends Core
   case class QualifiedId(value: Seq[Id]) extends Core
   case class QualifiedReference(value: Seq[Reference]) extends Core
   case class Reference(to: Id, typeApplication: Option[TypeApplication]) extends Core

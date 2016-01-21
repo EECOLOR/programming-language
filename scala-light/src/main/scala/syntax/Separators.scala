@@ -2,7 +2,7 @@ package syntax
 
 import fastparse.all._
 
-object Whitespace {
+object Separators {
 
   import ParserUtilities._
 
@@ -14,13 +14,15 @@ object Whitespace {
   }
 
   val `\n` = {
-    val actualNewLine     = P( "\n" )
-    val newLineWithSpaces = P( (" ".rep ~ actualNewLine ~ " ".rep).rep(min = 1) )
+    val newLineWithSpaces = P( (" ".rep ~ "\n" ~ " ".rep).rep(min = 1) )
     newLineWithSpaces
   }
 
-  lazy val `  ` = {
+  val `  ` = {
     val spacesWithNewLine = P( (" ".rep(min = 1) ~ "\n".? ~ " ".rep) | (" ".rep ~ "\n".? ~ " ".rep(min = 1)) )
     spacesWithNewLine
   }
+
+  val `,` =
+    P( ` \n`.? ~ "," ~/ ` \n` )
 }

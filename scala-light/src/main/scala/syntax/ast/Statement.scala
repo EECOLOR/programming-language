@@ -5,6 +5,8 @@ object Statement {
 
   import Core._
 
+  case class Package(path: Option[QualifiedId], body: Body) extends Core
+
   case class Marked(mark: Id, statement: Statement) extends Statement
 
   case class Comment(comment: Indexed) extends Statement
@@ -15,10 +17,8 @@ object Statement {
     case class Multiple(path: QualifiedReference, parts: Seq[Part]) extends Import
 
     trait Part
-    object Part {
-      case class Id(id: Core.Id) extends Part
-      case class As(original: Core.Id, newId: Core.Id) extends Part
-    }
+    case class Id(id: Core.Id) extends Part
+    case class As(original: Core.Id, newId: Core.Id) extends Part
   }
 
   case class Class(name: Id, typeArguments: Option[Arguments], arguments: Arguments, extensions: Seq[Extension], body: Option[Block]) extends Statement
