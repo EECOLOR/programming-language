@@ -26,7 +26,7 @@ object Parser {
 
   val literalGroups = Seq("\"\"\"", "`", "\"", "'")
   val illegalInId   = "{}() \n.,:[]" + literalGroups.mkString
-  val keywords      = Seq("package", "import", "object", "trait", "class", "val", "def", "let", "//", "=")
+  val keywords      = Seq("package", "import", "object", "trait", "class", "val", "def", "let", "=")
   val groupEscape   = "\\"
 
   object cores {
@@ -45,7 +45,7 @@ object Parser {
       import expressions.referenceExpression
       import expressions.productApplicationExpression
 
-      P( `  ` ~ id ~ `  ` ~ ((productExpression | referenceExpression) maybeFollowedBy productApplicationExpression).? ).map(Extension)
+      P( `  ` ~ id ~ `  ` ~ (productExpression | (referenceExpression maybeFollowedBy productApplicationExpression)).? ).map(Extension)
     }
 
     val typeApplication = {
@@ -61,7 +61,7 @@ object Parser {
       P( reference.+ separatedBy "." ).map(QualifiedReference)
 
     val block =
-      P( "{" ~/ (` \n` ~ body ~ ` \n`).? ~ "}" ).map(Block)
+      P( "{" ~/ (` \n` ~ body).? ~ ` \n`.? ~ "}" ).map(Block)
 
     val valueArguments =
       arguments("(", ")")
@@ -130,7 +130,7 @@ object Parser {
       import cores.body
       import cores.qualifiedId
 
-      P( ("package" ~ " " ~/ qualifiedId ~ ` \n`).? ~ body ~ `\n` ~ End ).map(Package)
+      P( ("package" ~ " " ~/ qualifiedId ~ `\n`).? ~ body ~ `\n` ~ End ).map(Package)
     }
 
     val statement: P[Statement] =
