@@ -13,5 +13,4 @@ object Expression {
   case class Product(expressions: Seq[Expression]) extends Expression
   case class ProductApplication(target: Expression, arguments: Seq[(Option[Id], Expression)]) extends Expression
   case class Reference(to: Shared.Reference) extends Expression
-  case class FunctionType(argumentType: Expression, resultType: Expression) extends Expression
 }
