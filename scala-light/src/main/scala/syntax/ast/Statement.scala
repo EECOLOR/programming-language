@@ -1,11 +1,11 @@
 package syntax.ast
 
-trait Statement
+import Shared._
+
+sealed trait Statement
 object Statement {
 
-  import Core._
-
-  case class Package(path: Option[QualifiedId], body: Body) extends Core
+  case class Package(path: Seq[Id], body: Seq[Statement | Expression]) extends Statement
 
   case class Marked(mark: Id, statement: Statement) extends Statement
 
@@ -13,25 +13,24 @@ object Statement {
 
   trait Import extends Statement
   object Import {
-    case class Single(path: QualifiedReference) extends Import
-    case class Multiple(path: QualifiedReference, parts: Seq[Part]) extends Import
+    case class Single(path: Reference) extends Import
+    case class Multiple(path: Reference, parts: Seq[Part]) extends Import
 
     trait Part
-    case class Id(id: Core.Id) extends Part
-    case class As(original: Core.Id, newId: Core.Id) extends Part
+    case class Id(id: Shared.Id) extends Part
+    case class As(original: Shared.Id, newId: Shared.Id) extends Part
   }
 
-  case class Class(name: Id, typeArguments: Option[Arguments], arguments: Arguments, extensions: Seq[Extension], body: Option[Block]) extends Statement
-  case class Object(name: Id, typeArguments: Option[Arguments], extensions: Seq[Extension], body: Option[Block]) extends Statement
-  case class Trait(name: Id, typeArguments: Option[Arguments], arguments: Option[Arguments], extensions: Seq[Extension], body: Option[Block]) extends Statement
+  case class Trait (name: Id, typeArguments: Seq[Argument], arguments: Seq[Argument], extensions: Seq[Extension], body: Seq[Statement | Expression]) extends Statement
+  case class Object(name: Id, typeArguments: Seq[Argument], extensions: Seq[Extension], body: Seq[Statement | Expression]) extends Statement
+  case class Class (name: Id, typeArguments: Seq[Argument], arguments: Seq[Argument], extensions: Seq[Extension], body: Seq[Statement | Expression]) extends Statement
 
-  case class Def(signature: Typed[(Id, Option[Arguments], Option[Arguments])], body: Expression) extends Statement
-  case class Val(id: Typed[(Id, Option[Arguments])], body: Expression) extends Statement
-  case class TypeConstructor(id: Id, typeArguments: Arguments, body: Expression) extends Statement
+  case class Extension(id: Id, expression: Expression)
 
-  case class UnimplementedMember(signature: Typed[(Id, Option[Arguments], Option[Arguments])]) extends Statement
+  case class Def(name: Id, typeArguments: Seq[Argument], arguments: Seq[Argument], `type`: Option[Expression], body: Expression) extends Statement
+  case class Val(id: Id, typeArguments: Seq[Argument], `type`: Option[Expression], body: Expression) extends Statement
+  case class TypeConstructor(id: Id, typeArguments: Seq[Argument], body: Expression) extends Statement
+  case class UnimplementedMember(id: Id, typeArguments: Seq[Argument], arguments:Seq[Argument], `type`: Expression) extends Statement
 
-  case class MemberExtraction(target: Option[QualifiedReference], members: Seq[Id], expression: Expression) extends Statement
-
-  type |[+A, +B] = Either[A, B]
+  case class MemberExtraction(target: Option[Reference], members: Seq[Id], source: Expression) extends Statement
 }

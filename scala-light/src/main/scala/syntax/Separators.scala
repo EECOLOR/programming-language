@@ -6,7 +6,7 @@ object Separators {
 
   import ParserUtilities._
 
-  val ` ` = P( include(" ") )
+  val ` ` = P( space(min = 1) )
 
   val ` \n` = {
     val whitespace = P( include(" \n") )
@@ -14,15 +14,19 @@ object Separators {
   }
 
   val `\n` = {
-    val newLineWithSpaces = P( (" ".rep ~ "\n" ~ " ".rep).rep(min = 1) )
+    val newLineWithSpaces = P( (` `.? ~ "\n" ~ ` `.?).rep(min = 1) )
     newLineWithSpaces
   }
 
   val `  ` = {
-    val spacesWithNewLine = P( (" ".rep(min = 1) ~ "\n".? ~ " ".rep) | (" ".rep ~ "\n".? ~ " ".rep(min = 1)) )
+    val spacesWithNewLine = P( (` ` ~ "\n".? ~ ` `.?) | (` `.? ~ "\n".? ~ ` `) )
     spacesWithNewLine
   }
 
-  val `,` =
-    P( ` \n`.? ~ "," ~/ ` \n` )
+  val `,` = {
+    val comma = P( ` \n`.? ~ "," ~/ ` \n` )
+    comma
+  }
+
+  private def space(min: Int) = CharsWhile(_ == ' ', min)
 }

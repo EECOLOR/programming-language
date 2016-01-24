@@ -13,7 +13,7 @@ object Parser {
 
   import Separators._
   import ParserUtilities._
-  import ast._
+  import ast.Constructors._
 
   val parserEnhancements =
     new ParserEnhancements(
@@ -26,121 +26,25 @@ object Parser {
 
   val literalGroups = Seq("\"\"\"", "`", "\"", "'")
   val illegalInId   = "{}() \n.,:[]" + literalGroups.mkString
-  val keywords      = Seq("package", "import", "object", "trait", "class", "val", "def", "let", "=")
+  val keywords      = Seq("=")
   val groupEscape   = "\\"
-
-  object cores {
-    import Core._
-
-    val body = {
-        import statements.statement
-        import expressions.expression
-        import AlternativeParserBehavior.OrToEither
-
-        P( (statement | expression).* separatedBy `\n` ).map(Body)
-      }
-
-    val extension = {
-      import expressions.productExpression
-      import expressions.referenceExpression
-      import expressions.productApplicationExpression
-
-      P( `  ` ~ id ~ `  ` ~ (productExpression | (referenceExpression maybeFollowedBy productApplicationExpression)).? ).map(Extension)
-    }
-
-    val typeApplication = {
-      import expressions.expression
-
-      P( "[" ~/ ` \n`.? ~ (expression.+ separatedBy `,`) ~ ` \n`.? ~ "]" ).map(TypeApplication)
-    }
-
-    val reference =
-      P( id ~  typeApplication.? ).map(Reference)
-
-    val qualifiedReference =
-      P( reference.+ separatedBy "." ).map(QualifiedReference)
-
-    val block =
-      P( "{" ~/ (` \n` ~ body).? ~ ` \n`.? ~ "}" ).map(Block)
-
-    val valueArguments =
-      arguments("(", ")")
-
-    val typeArguments =
-      arguments("[", "]")
-
-    def arguments(`<`: String, `>`: String) =
-      P( `<` ~/ ` \n`.? ~ (argument.* separatedBy `,`) ~ ` \n`.? ~ `>` ).map(Arguments)
-
-    val argument = {
-      import expressions.expression
-
-      P( optionalTyped(id) ~ (` ` ~ "=" ~ `  ` ~/ expression).? ).map(Argument)
-    }
-
-    val id = {
-     import AlternativeParserBehavior.OrToEither
-
-
-      P( literal | literalGroup ).map(Id)
-    }
-
-    val literal = {
-      val legalInId = P( not(illegalInId) )
-      val keyword = P( StringIn(keywords: _*) ~ !legalInId )
-
-      P( indexed( !keyword ~ legalInId ) )
-    }
-
-    val qualifiedId =
-      P( id.+ separatedBy "." ).map(QualifiedId)
-
-    val literalGroup = {
-      def toLiteralGroupParser(c: String) = {
-        val escaped = (groupEscape ~ (c | groupEscape).!) | groupEscape.!
-        val group   = (not(c + groupEscape) | escaped).*.map(_.mkString)
-
-        (c ~/ indexed( group ) ~ c).map(Core.LiteralGroup(c, _))
-      }
-
-      P( literalGroups.map(toLiteralGroupParser).reduce(_ | _) )
-    }
-
-    def optionalTyped[A](p: Parser[A]) =
-      P( p ~ typeAscription.? ).map(Typed[A])
-
-    def typed[A](p: Parser[A]) =
-      P( p ~ typeAscription.map(Option(_)) ).map(Typed[A])
-
-    val typeAscription = {
-      import expressions.noFunctionExpression
-
-      P( ` `.? ~ ":" ~ ` ` ~/ noFunctionExpression )
-    }
-
-    def indexed(p: => Parser[String]) =
-      (Index ~ p).map(Indexed)
-  }
 
   object statements {
 
-    import Statement._
+    import shared._
+    import expressions._
+    import ast.Statement
+    import ast.Statement._
 
     val `package` = {
-      import cores.body
-      import cores.qualifiedId
-
-      P( ("package" ~ " " ~/ qualifiedId ~ `\n`).? ~ body ~ `\n` ~ End ).map(Package)
+      P( ("package" ~ ` ` commit (id.+ separatedBy ".") ~ `\n`).? ~ body ~ `\n` ~ End ).map(construct[Package])
     }
 
     val statement: P[Statement] =
-      P( markedStatement | unmarkedStatement )
+      P( markedStatement.noCommit | unmarkedStatement )
 
-    val markedStatement = {
-      import cores.id
-
-      P( NoCut(id) ~ ` ` ~ unmarkedStatement ).map(Marked)
-    }
+    val markedStatement =
+      P( id ~ ` ` ~ unmarkedStatement ).map(Marked)
 
     val unmarkedStatement: P[Statement] =
       P(
@@ -150,194 +54,181 @@ object Parser {
         memberExtraction | unimplementedMemberStatement
       )
 
-    val commentStatement = {
-      import cores.indexed
+    val commentStatement =
+      P( "//" commit indexed( not("\n") ) ).map(Comment)
 
-      P( "//" ~/ indexed( not("\n") ) ).map(Comment)
+    val importStatement: P[Import] = {
+
+      val importSingle =
+        P( reference ).map(Import.Single)
+
+      val importMultiple = {
+        val importId = P( id ).map(Import.Id)
+        val importAs = P( id.noCommit ` ` "=>" ` ` id ).map(Import.As)
+
+        P( reference ~ "." ~ commaSeparated("{" , (importAs | importId).+ , "}") ).map(Import.Multiple)
+      }
+
+      P( "import" ~ ` ` commit (importMultiple | importSingle) )
     }
 
-    val importStatement: P[Import] =
-      P( "import" ~ " " ~/ (importMultiple | importSingle) )
+    val traitStatement =
+      P( "trait" ~ ` ` commit id ~ typeArguments.? ~ valueArguments.? ~ extension.* ~(`  ` ~ block).? ).map(construct[Trait])
 
-    val importSingle = {
-      import cores.qualifiedReference
-      P( qualifiedReference ).map(Import.Single)
-    }
+    val objectStatement =
+      P( "object" ~ ` ` commit id ~ typeArguments.? ~ extension.* ~ (`  ` ~ block).? ).map(construct[Object])
 
-    val importMultiple = {
-      import cores.qualifiedReference
-      P( qualifiedReference ~ ".{" ~/ ` \n` ~ ((importAs | importId).+ separatedBy `,`) ` \n` "}" ).map(Import.Multiple)
-    }
+    val classStatement =
+      P( "class" ~ ` ` commit id ~ typeArguments.? ~ valueArguments ~ extension.* ~ (`  ` ~ block).? ).map(construct[Class])
 
-    val importId = {
-      import cores.id
+    val extension =
+      P( `  ` ~ id ~ `  ` ~ (product | (referenceExpression maybeFollowedBy productApplication)) ).map(Extension)
 
-      P( id ).map(Import.Id)
-    }
+    val valStatement =
+      P( "val" ~ ` ` commit id ~ typeArguments.? ~ typeAscription.? ` ` "=" `  ` expression).map(construct[Val])
 
-    val importAs = {
-      import cores.id
+    val defStatement =
+      P( "def" ~ ` ` commit id ~ typeArguments.? ~ valueArguments.? ~ typeAscription.? ` ` "=" `  ` expression).map(construct[Def])
 
-      P( id ` ` "=>" ` ` id ).map(Import.As)
-    }
+    val letStatement =
+      P( "let" ~ ` ` commit id ~ typeArguments.? ` ` "=" `  ` expression ).map(construct[TypeConstructor])
 
-    val traitStatement = {
-      import cores.typeArguments
-      import cores.valueArguments
-      import cores.block
-      import cores.extension
-      import cores.id
+    val unimplementedMemberStatement =
+      P( (id ~ typeArguments.? ~ valueArguments.? ~ typeAscription).noCommit ~ &(`\n`) ).map(construct[UnimplementedMember])
 
-      P( "trait" ~/ ` ` ~ id ~ (` `.? ~ typeArguments).? ~ (` `.? ~ valueArguments).? ~ extension.* ~(` ` ~ block).? ).map(Statement.Trait)
-    }
+    val memberExtraction =
+      P( reference.noCommit.? ~ ` `.? ~ commaSeparated("(" , id.+ , ")").noCommit ` ` "=" ~ `  ` commit  expression).map(MemberExtraction)
 
-    val objectStatement = {
-      import cores.typeArguments
-      import cores.block
-      import cores.extension
-      import cores.id
-
-      P( "object" ~ ` ` ~/ id ~ (` `.? ~ typeArguments).? ~ extension.* ~ (` ` ~ block).? ).map(Statement.Object)
-    }
-
-    val classStatement = {
-      import cores.typeArguments
-      import cores.valueArguments
-      import cores.block
-      import cores.extension
-      import cores.id
-
-      P( "class" ~ ` ` ~/ id ~ (` `.? ~ typeArguments).? ~ ` `.? ~ valueArguments ~ extension.* ~ (` ` ~ block).? ).map(Statement.Class)
-    }
-
-    val valStatement = {
-      import cores.typeArguments
-      import expressions.expression
-      import cores.id
-      import cores.optionalTyped
-
-      P( "val" ~ ` ` ~/ optionalTyped(id ~ (` `.? ~ typeArguments).?) ` ` "=" ` \n` expression).map(Statement.Val)
-    }
-
-    val defStatement = {
-      import cores.typeArguments
-      import cores.valueArguments
-      import expressions.expression
-      import cores.id
-      import cores.optionalTyped
-
-      P( "def" ~ ` ` ~/ optionalTyped(id ~/ (` `.? ~ typeArguments).? ~ (` `.? ~ valueArguments).?) ` ` "=" ~ `  ` ~ expression).map(Statement.Def)
-    }
-
-    val letStatement = {
-      import cores.typeArguments
-      import expressions.expression
-      import cores.id
-
-      P( "let" ~ ` ` ~/ id ~ typeArguments ` ` "=" ` \n` expression ).map(Statement.TypeConstructor)
-    }
-
-    val unimplementedMemberStatement = {
-      import cores.typeArguments
-      import cores.valueArguments
-      import cores.id
-      import cores.typed
-
-      P( typed(NoCut(id ~ (` `.? ~ typeArguments).? ~ (` `.? ~ valueArguments).?)) ).map(Statement.UnimplementedMember)
-    }
-
-    val memberExtraction = {
-      import cores.qualifiedReference
-      import expressions.expression
-      import cores.id
-
-      P( NoCut(qualifiedReference.?) ~ ` `.? ~ "(" ~ `  `.? ~ NoCut(id.+ separatedBy `,`) ~ `  `.? ~ ")" ` ` "=" ~ `  ` ~/  expression).map(Statement.MemberExtraction)
-    }
+    val typeArguments =
+      P( ` `.? ~ arguments("[", "]") )
   }
 
   object expressions {
 
-    import Expression._
+    import shared._
+    import ast.Expression
+    import ast.Expression._
 
     val expression: P[Expression] =
-      P( functionExpression | noFunctionExpression )
+      P( function | (noWhitespaceExpression maybeFollowedBy whitespaceApplication) )
 
-    val functionExpression = {
-      import cores.valueArguments
-      import cores.id
+    lazy val noWhitespaceExpression: P[Expression] =
+      P( blockFunction | blockExpression | product | markedLiteralGroup | referenceExpression )
+        .maybeFollowedBy(memberAccess, productApplication, blockFunctionApplication, blockApplication)
+
+    val function =
+      P( functionArguments ` ` "=>" ~ `  ` commit expression ).map(construct[Function])
+
+    val blockFunction =
+      P("{" ` ` functionArguments ` ` "=>" ~ ` \n` commit body ~ ` \n`.? ~ "}").map(construct[Function])
+
+    val blockExpression =
+      P( block ).map(construct[Block])
+
+    val product =
+      P( commaSeparated("(" , expression.* , ")") ).map(Product)
+
+    val markedLiteralGroup =
+      P( literal.noCommit ~ literalGroup).map(MarkedLiteralGroup)
+
+    val referenceExpression =
+      P( reference ).map(Reference)
+
+    val whitespaceApplication =
+      P( ` ` ~ idReference ~ `  ` commit noWhitespaceExpression ).map(construct[Expression => Application])
+
+    val productApplication =
+      P( ` `.? ~ commaSeparated("(" , (namedArgument.? ~ expression).* , ")") )
+        .map(construct[Expression => ProductApplication])
+
+    val blockFunctionApplication =
+      P(` `.? ~ blockFunction ).map(construct[Expression => Application])
+
+    val blockApplication =
+      P( ` `.? ~ blockExpression ).map(construct[Expression => Application])
+
+    val memberAccess =
+      P( `  `.? ~ "." commit idReference ).map(construct[Expression => MemberAccess])
+
+    val functionArguments = {
       import AlternativeParserBehavior.OrToEither
-      import cores.optionalTyped
 
-      P( (NoCut(valueArguments) | NoCut(optionalTyped(id))) ` ` "=>" ~ `  ` ~/ expression ).map(Function)
+      P(valueArguments.noCommit | id.noCommit)
     }
 
-    val noFunctionExpression: P[Expression] =
-      P( noWhitespaceApplicationExpression )
-        .maybeFollowedBy(whitespaceApplicationExpression)
+    val namedArgument =
+      P( id.noCommit ` ` "=" ~ ` \n`.commit )
+  }
 
-    def whitespaceApplicationExpression(e: Expression) = {
-      import cores.reference
+  object shared {
 
-      P( ` ` ~ reference ~ `  ` ~/ noWhitespaceApplicationExpression ).map(WhitespaceApplication(e, _))
-    }
+    import ast.Shared._
 
-    val noWhitespaceApplicationExpression: P[Expression] =
-      P( blockFunctionExpression | blockExpression | markedLiteralGroup | referenceExpression | productExpression )
-        .maybeFollowedBy(
-          memberAccessExpression,
-          productApplicationExpression,
-          blockFunctionApplicationExpression,
-          blockApplicationExpression
-        )
+    import statements.statement
+    import expressions.expression
 
-    val blockFunctionExpression = {
-      import cores.valueArguments
-      import cores.body
+    val body = {
       import AlternativeParserBehavior.OrToEither
-      import cores.id
-      import cores.optionalTyped
 
-      P("{" ` ` (NoCut(valueArguments) | NoCut(optionalTyped(id))) ` ` "=>" ~ ` \n` ~/ body ~ ` \n`.? ~ "}").map(BlockFunction)
+      P( (statement | expression).* separatedBy `\n` )
     }
 
-    val blockExpression = {
-      import cores.block
+    val idReference = {
+      val typeApplication = commaSeparated( "[" , expression.+ , "]" )
 
-      P( block ).map(Block)
+      P( id ~  typeApplication.? ).map(construct[IdReference])
     }
 
-    val referenceExpression = {
-      import cores.qualifiedReference
+    val id = {
+     import AlternativeParserBehavior.OrToEither
 
-      P( qualifiedReference ).map(Reference)
+      P( literal | literalGroup )
     }
 
-    val productExpression = {
-      import cores.id
+    val literal = {
+      val legalInId = P( not(illegalInId) )
+      val keyword = P( StringIn(keywords: _*) ~ !legalInId )
 
-      P( "(" ~/ ` \n`.? ~ (((NoCut(id) ` ` "=" ~ ` \n`.~/).? ~ expression).* separatedBy `,`) ~ ` \n`.? ~ ")" ).map(Product)
+      P( indexed( !keyword ~ legalInId ) )
     }
 
-    val markedLiteralGroup = {
-      import cores.literal
-      import cores.literalGroup
+    val literalGroup = {
+      def toLiteralGroupParser(c: String) = {
+        val escaped = (groupEscape ~ (c | groupEscape).!) | groupEscape.!
+        val group   = (not(c + groupEscape) | escaped).*.map(_.mkString)
 
-      P( NoCut(literal) ~ literalGroup).map(MarkedLiteralGroup)
+        (c commit indexed( group ) ~ c).map(LiteralGroup(c, _))
+      }
+
+      P( literalGroups.map(toLiteralGroupParser).reduce(_ | _) )
     }
 
-    def productApplicationExpression(e: Expression) =
-      P( ` `.? ~ productExpression ).map(ProductApplication(e, _))
+    def indexed(p: => Parser[String]) =
+      (Index ~ p).map(Indexed)
 
-    def blockFunctionApplicationExpression(e: Expression) =
-      P(` `.? ~ blockFunctionExpression ).map(BlockFunctionApplication(e, _))
+    val reference =
+      P( idReference.+ separatedBy "." )
 
-    def blockApplicationExpression(e: Expression) =
-      P( ` `.? ~ blockExpression ).map(Expression.BlockApplication(e, _))
+    val block =
+      group("{" , body.? , "}")
 
-    def memberAccessExpression(e: Expression) = {
-      import cores.qualifiedReference
+    val valueArguments =
+      P( ` `.? ~ arguments("(", ")") )
 
-      P( `  `.? ~ "." ~/ qualifiedReference ).map(MemberAccess(e, _))
+    def arguments(`<`: String, `>`: String) = {
+      val defaultValue = P(` ` ~ "=" ~ `  ` commit expression)
+      val argument = P( id ~ typeAscription.? ~ defaultValue.? ).map(Argument)
+
+      commaSeparated(`<` , argument.* , `>`)
     }
+
+    def commaSeparated[A](`<`: String, body: Parser[Seq[A]] with Separator[A], `>`: String) =
+      group(`<` , body separatedBy `,` , `>`)
+
+    def group[A](`<`: String, body: Parser[A], `>`: String) =
+      P( `<` commit ` \n`.? ~ body ~ ` \n`.? ~ `>` )
+
+    val typeAscription =
+      P( ` `.? ~ ":" ~ ` ` commit expression )
   }
 }

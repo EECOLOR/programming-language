@@ -5,12 +5,6 @@ import fastparse.ParserApi
 
 object ParserUtilities {
 
-  implicit def constructorAlignment_1[A, B, C]         : ((A, B) => C)          => ((A, B))          => C = f => { case (a, b)          => f(a, b) }
-  implicit def constructorAlignment_2[A, B, C, D]      : ((A, B, C) => D)       => ((A, B, C))       => D = f => { case (a, b, c)       => f(a, b, c) }
-  implicit def constructorAlignment_3[A, B, C, D, E]   : ((A, B, C, D) => E)    => ((A, B, C, D))    => E = f => { case (a, b, c, d)    => f(a, b, c, d) }
-  implicit def constructorAlignment_4[A, B, C, D, E, F]: ((A, B, C, D, E) => F) => ((A, B, C, D, E)) => F = f => { case (a, b, c, d, e) => f(a, b, c, d, e) }
-  implicit def constructorAlignment_5[A, B, C, D]      : ((A, B, C) => D)       => (A, (B, C))       => D = f => { case (a, (b, c))     => f(a, b, c) }
-
   object AlternativeParserBehavior {
 
     implicit class OrToEither[A](a: Parser[A]) {
