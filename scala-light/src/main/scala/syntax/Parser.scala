@@ -110,10 +110,13 @@ object Parser {
     import ast.Expression._
 
     val expression: P[Expression] =
-      P( function | (noWhitespaceExpression maybeFollowedBy whitespaceApplication) )
+      P( function | blockFunction | noFunctionExpression )
+
+    val noFunctionExpression =
+      P( noWhitespaceExpression maybeFollowedBy whitespaceApplication)
 
     lazy val noWhitespaceExpression: P[Expression] =
-      P( blockFunction | blockExpression | product | markedLiteralGroup | referenceExpression )
+      P( blockExpression | product | markedLiteralGroup | referenceExpression )
         .maybeFollowedBy(memberAccess, productApplication, blockFunctionApplication, blockApplication)
 
     val function =
@@ -166,6 +169,7 @@ object Parser {
 
     import statements.statement
     import expressions.expression
+    import expressions.noFunctionExpression
 
     val body = {
       import AlternativeParserBehavior.OrToEither
@@ -229,6 +233,6 @@ object Parser {
       P( `<` commit ` \n`.? ~ body ~ ` \n`.? ~ `>` )
 
     val typeAscription =
-      P( ` `.? ~ ":" ~ ` ` commit expression )
+      P( ` `.? ~ ":" ~ ` ` commit noFunctionExpression )
   }
 }

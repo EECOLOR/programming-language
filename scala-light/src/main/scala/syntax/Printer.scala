@@ -59,7 +59,7 @@ trait DefaultPrinters {
     case x: Block => "{\n" + print(x.body) + "\n}"
     case x: Function => "((" + print(x.arguments) + ") => " + print(x.body) + ")"
     case x: MarkedLiteralGroup => "<" + print(x.mark) + ">" + print(x.literalGroup)
-    case x: MemberAccess => "(" + print(x.expression) + "." + print(x.member) + ")"
+    case x: MemberAccess => "(" + print(x.target) + "." + print(x.member) + ")"
     case x: ProductApplication => "(" + print(x.target) + ".apply(" + (x.arguments map print[(Option[Id], Expression)] mkString ", ") + "))"
     case x: Expression.Reference => print(x.to)
   }
