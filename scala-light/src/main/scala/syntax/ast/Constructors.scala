@@ -63,10 +63,10 @@ object Constructors {
     }
   }
 
-  implicit object BlockFunctionConstructor extends Constructor[Function] {
+  implicit object BlockFunctionConstructor extends Constructor[BlockFunction] {
     type From = (Seq[Argument] | Id, Seq[Statement | Expression])
     val construct: From => To = { case (arguments, body) =>
-      Function(ArgumentsConstructor construct arguments, Block(body))
+      BlockFunction(ArgumentsConstructor construct arguments, Block(body))
     }
   }
 
@@ -80,17 +80,24 @@ object Constructors {
     val construct: From => To = _.right.map(ArgumentConstructor.construct).merge
   }
 
-  implicit object WhitespaceApplicationConstructor extends Constructor[Expression => Application] {
+  implicit object WhitespaceApplicationConstructor extends Constructor[Expression => WhitespaceApplication] {
     type From = (IdReference, Expression)
     val construct: From => To = { case (method, argument) =>
-      target => Application(MemberAccess(target, method), argument)
+      target => WhitespaceApplication(target, method, argument)
     }
   }
 
   implicit object ProductApplicationConstructor extends Constructor[Expression => ProductApplication] {
-    type From = Seq[(Option[Id], Expression)]
+    type From = Seq[Expression]
     val construct: From => To = { case (arguments) =>
       target => ProductApplication(target, arguments)
+    }
+  }
+
+  implicit object NamedProductApplicationConstructor extends Constructor[Expression => NamedProductApplication] {
+    type From = Seq[(Option[Id], Expression)]
+    val construct: From => To = { case (arguments) =>
+      target => NamedProductApplication(target, arguments)
     }
   }
 

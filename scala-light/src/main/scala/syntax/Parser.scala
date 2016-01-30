@@ -82,7 +82,7 @@ object Parser {
       P( "class" ~ ` ` commit id ~ typeArguments.? ~ valueArguments ~ extension.* ~ (`  ` ~ block).? ).map(construct[Class])
 
     val extension =
-      P( `  ` ~ id ~ `  ` ~ (product | (referenceExpression maybeFollowedBy productApplication)) ).map(Extension)
+      P( `  ` ~ id ~ `  ` ~ (product | (referenceExpression maybeFollowedBy (productApplication| namedProductApplication))) ).map(Extension)
 
     val valStatement =
       P( "val" ~ ` ` commit id ~ typeArguments.? ~ typeAscription.? ` ` "=" `  ` expression).map(construct[Val])
@@ -117,13 +117,13 @@ object Parser {
 
     lazy val noWhitespaceExpression: P[Expression] =
       P( blockExpression | product | markedLiteralGroup | referenceExpression )
-        .maybeFollowedBy(memberAccess, productApplication, blockFunctionApplication, blockApplication)
+        .maybeFollowedBy(memberAccess, productApplication, blockFunctionApplication, blockApplication, namedProductApplication)
 
     val function =
       P( functionArguments ` ` "=>" ~ `  ` commit expression ).map(construct[Function])
 
     val blockFunction =
-      P("{" ` ` functionArguments ` ` "=>" ~ ` \n` commit body ~ ` \n`.? ~ "}").map(construct[Function])
+      P("{" ` ` functionArguments ` ` "=>" ~ ` \n` commit body ~ ` \n`.? ~ "}").map(construct[BlockFunction])
 
     val blockExpression =
       P( block ).map(construct[Block])
@@ -138,11 +138,15 @@ object Parser {
       P( reference ).map(Reference)
 
     val whitespaceApplication =
-      P( ` ` ~ idReference ~ `  ` commit noWhitespaceExpression ).map(construct[Expression => Application])
+      P( ` ` ~ idReference ~ `  ` commit noWhitespaceExpression ).map(construct[Expression => WhitespaceApplication])
 
     val productApplication =
-      P( ` `.? ~ commaSeparated("(" , (namedArgument.? ~ expression).* , ")") )
+      P( ` `.? ~ commaSeparated("(" , expression.* , ")") )
         .map(construct[Expression => ProductApplication])
+
+    val namedProductApplication =
+      P( ` `.? ~ commaSeparated("(" , (namedArgument.? ~ expression).* , ")") )
+        .map(construct[Expression => NamedProductApplication])
 
     val blockFunctionApplication =
       P(` `.? ~ blockFunction ).map(construct[Expression => Application])

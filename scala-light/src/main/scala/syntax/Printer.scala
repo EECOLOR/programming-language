@@ -57,11 +57,14 @@ trait DefaultPrinters {
     case x: Product => "(" + (x.expressions map print[Expression] mkString ", ") + ")"
     case x: Application => "(" + print(x.target) + ".apply(" + print(x.argument) + "))"
     case x: Block => "{\n" + print(x.body) + "\n}"
+    case x: BlockFunction => "{" + print(x.arguments) + ") => " + print(x.body) + "}"
     case x: Function => "((" + print(x.arguments) + ") => " + print(x.body) + ")"
     case x: MarkedLiteralGroup => "<" + print(x.mark) + ">" + print(x.literalGroup)
     case x: MemberAccess => "(" + print(x.target) + "." + print(x.member) + ")"
-    case x: ProductApplication => "(" + print(x.target) + ".apply(" + (x.arguments map print[(Option[Id], Expression)] mkString ", ") + "))"
+    case x: NamedProductApplication => "(" + print(x.target) + ".apply(" + (x.arguments map print[(Option[Id], Expression)] mkString ", ") + "))"
+    case x: ProductApplication => "(" + print(x.target) + ".apply(" + (x.arguments map print[Expression] mkString ", ") + "))"
     case x: Expression.Reference => print(x.to)
+    case x: WhitespaceApplication => "(" + print(x.target) + " " + print(x.method) + " " + print(x.argument) + ")"
   }
   implicit def _04: Printer[Seq[Statement | Expression]] = p(x => "  " + (x map print[Statement | Expression] mkString "\n") replace ("\n", "\n  "))
   implicit def _05: Printer[Indexed] = p(_.value)
