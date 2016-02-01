@@ -33,18 +33,19 @@ object Parser {
 
     import shared._
     import expressions._
+    import ast.Expression
     import ast.Statement
     import ast.Statement._
 
     val `package` = {
-      P( ("package" ~ ` ` commit (id.+ separatedBy ".") ~ `\n`).? ~ body ~ `\n` ~ End ).map(construct[Package])
+      PP( ("package" ~ ` ` commit (id.+ separatedBy ".") ~ `\n`).? ~ body ~ `\n` ~ End ).map(construct[Package])
     }
 
     val statement: P[Statement] =
       P( markedStatement.noCommit | unmarkedStatement )
 
     val markedStatement =
-      P( id ~ ` ` ~ unmarkedStatement ).map(Marked)
+      PP( id ~ ` ` ~ unmarkedStatement ).map(construct[Marked])
 
     val unmarkedStatement: P[Statement] =
       P(
@@ -55,49 +56,53 @@ object Parser {
       )
 
     val commentStatement =
-      P( "//" commit indexed( not("\n") ) ).map(Comment)
+      PP( "//" commit indexed( not("\n") ) ).map(construct[Comment])
 
     val importStatement: P[Import] = {
+      import AlternativeParserBehavior.OrToEither
 
       val importSingle =
-        P( reference ).map(Import.Single)
+        PP( reference ).map(construct[Import.Single])
 
       val importMultiple = {
-        val importId = P( id ).map(Import.Id)
-        val importAs = P( id.noCommit ` ` "=>" ` ` id ).map(Import.As)
+        val importId = PP( id ).map(construct[Import.Id])
+        val importAs = PP( id.noCommit ` ` "=>" ` ` id ).map(construct[Import.As])
 
-        P( reference ~ "." ~ commaSeparated("{" , (importAs | importId).+ , "}") ).map(Import.Multiple)
+        PP( reference ~ "." ~ commaSeparated("{" , (importAs | importId).+ , "}") ).map(construct[Import.Multiple])
       }
 
-      P( "import" ~ ` ` commit (importMultiple | importSingle) )
+      PP( "import" ~ ` ` commit (importMultiple | importSingle) ).map(construct[Import])
     }
 
     val traitStatement =
-      P( "trait" ~ ` ` commit id ~ typeArguments.? ~ valueArguments.? ~ extension.* ~(`  ` ~ block).? ).map(construct[Trait])
+      PP( "trait" ~ ` ` commit id ~ typeArguments.? ~ valueArguments.? ~ extension.* ~(`  ` ~ block).? ).map(construct[Trait])
 
     val objectStatement =
-      P( "object" ~ ` ` commit id ~ typeArguments.? ~ extension.* ~ (`  ` ~ block).? ).map(construct[Object])
+      PP( "object" ~ ` ` commit id ~ typeArguments.? ~ extension.* ~ (`  ` ~ block).? ).map(construct[Object])
 
     val classStatement =
-      P( "class" ~ ` ` commit id ~ typeArguments.? ~ valueArguments ~ extension.* ~ (`  ` ~ block).? ).map(construct[Class])
+      PP( "class" ~ ` ` commit id ~ typeArguments.? ~ valueArguments ~ extension.* ~ (`  ` ~ block).? ).map(construct[Class])
 
-    val extension =
-      P( `  ` ~ id ~ `  ` ~ (product | (referenceExpression maybeFollowedBy (productApplication| namedProductApplication))) ).map(Extension)
+    val extension = {
+      val reference: P[Expression] = (product | (referenceExpression maybeFollowedBy (productApplication | namedProductApplication)))
+
+      PP( `  ` ~ id ~ `  ` ~ reference ).map(construct[Extension])
+    }
 
     val valStatement =
-      P( "val" ~ ` ` commit id ~ typeArguments.? ~ typeAscription.? ` ` "=" `  ` expression).map(construct[Val])
+      PP( "val" ~ ` ` commit id ~ typeArguments.? ~ typeAscription.? ` ` "=" `  ` expression).map(construct[Val])
 
     val defStatement =
-      P( "def" ~ ` ` commit id ~ typeArguments.? ~ valueArguments.? ~ typeAscription.? ` ` "=" `  ` expression).map(construct[Def])
+      PP( "def" ~ ` ` commit id ~ typeArguments.? ~ valueArguments.? ~ typeAscription.? ` ` "=" `  ` expression).map(construct[Def])
 
     val letStatement =
-      P( "let" ~ ` ` commit id ~ typeArguments.? ` ` "=" `  ` expression ).map(construct[TypeConstructor])
+      PP( "let" ~ ` ` commit id ~ typeArguments.? ` ` "=" `  ` expression ).map(construct[TypeConstructor])
 
     val unimplementedMemberStatement =
-      P( (id ~ typeArguments.? ~ valueArguments.? ~ typeAscription).noCommit ~ &(`\n`) ).map(construct[UnimplementedMember])
+      PP( (id ~ typeArguments.? ~ valueArguments.? ~ typeAscription).noCommit ~ &(`\n`) ).map(construct[UnimplementedMember])
 
     val memberExtraction =
-      P( reference.noCommit.? ~ ` `.? ~ commaSeparated("(" , id.+ , ")").noCommit ` ` "=" ~ `  ` commit  expression).map(MemberExtraction)
+      PP( reference.noCommit.? ~ ` `.? ~ commaSeparated("(" , id.+ , ")").noCommit ` ` "=" ~ `  ` commit  expression).map(construct[MemberExtraction])
 
     val typeArguments =
       P( ` `.? ~ arguments("[", "]") )
@@ -117,45 +122,45 @@ object Parser {
 
     lazy val noWhitespaceExpression: P[Expression] =
       P( blockExpression | product | markedLiteralGroup | referenceExpression )
-        .maybeFollowedBy(memberAccess, productApplication, blockFunctionApplication, blockApplication, namedProductApplication)
+        .maybeFollowedBy(memberAccess, productApplication.noCommit, namedProductApplication, blockFunctionApplication, blockApplication)
 
     val function =
-      P( functionArguments ` ` "=>" ~ `  ` commit expression ).map(construct[Function])
+      PP( functionArguments ` ` "=>" ~ `  ` commit expression ).map(construct[Function])
 
     val blockFunction =
-      P("{" ` ` functionArguments ` ` "=>" ~ ` \n` commit body ~ ` \n`.? ~ "}").map(construct[BlockFunction])
+      PP("{" ` ` functionArguments ` ` "=>" ~ ` \n` commit body ~ ` \n`.? ~ "}").map(construct[BlockFunction])
 
     val blockExpression =
-      P( block ).map(construct[Block])
+      PP( block ).map(construct[Block])
 
     val product =
-      P( commaSeparated("(" , expression.* , ")") ).map(Product)
+      PP( commaSeparated("(" , expression.* , ")") ).map(construct[Product])
 
     val markedLiteralGroup =
-      P( literal.noCommit ~ literalGroup).map(MarkedLiteralGroup)
+      PP( literal.noCommit ~ literalGroup).map(construct[MarkedLiteralGroup])
 
     val referenceExpression =
-      P( reference ).map(Reference)
+      PP( reference ).map(construct[Reference])
 
     val whitespaceApplication =
-      P( ` ` ~ idReference ~ `  ` commit noWhitespaceExpression ).map(construct[Expression => WhitespaceApplication])
+      PP( ` ` ~ idReference ~ `  ` commit noWhitespaceExpression ).map(construct[Expression => WhitespaceApplication])
 
     val productApplication =
-      P( ` `.? ~ commaSeparated("(" , expression.* , ")") )
+      PP( ` `.? ~ commaSeparated("(" , expression.* , ")") )
         .map(construct[Expression => ProductApplication])
 
     val namedProductApplication =
-      P( ` `.? ~ commaSeparated("(" , (namedArgument.? ~ expression).* , ")") )
+      PP( ` `.? ~ commaSeparated("(" , (namedArgument.? ~ expression).* , ")") )
         .map(construct[Expression => NamedProductApplication])
 
     val blockFunctionApplication =
-      P(` `.? ~ blockFunction ).map(construct[Expression => Application])
+      PP(` `.? ~ blockFunction ).map(construct[Expression => Application])
 
     val blockApplication =
-      P( ` `.? ~ blockExpression ).map(construct[Expression => Application])
+      PP( ` `.? ~ blockExpression ).map(construct[Expression => Application])
 
     val memberAccess =
-      P( `  `.? ~ "." commit idReference ).map(construct[Expression => MemberAccess])
+      PP( `  `.? ~ "." commit idReference ).map(construct[Expression => MemberAccess])
 
     val functionArguments = {
       import AlternativeParserBehavior.OrToEither
@@ -184,7 +189,7 @@ object Parser {
     val idReference = {
       val typeApplication = commaSeparated( "[" , expression.+ , "]" )
 
-      P( id ~  typeApplication.? ).map(construct[IdReference])
+      PP( id ~  typeApplication.? ).map(construct[IdReference])
     }
 
     val id = {
@@ -205,14 +210,14 @@ object Parser {
         val escaped = (groupEscape ~ (c | groupEscape).!) | groupEscape.!
         val group   = (not(c + groupEscape) | escaped).*.map(_.mkString)
 
-        (c commit indexed( group ) ~ c).map(LiteralGroup(c, _))
+        PP(c.! commit indexed( group ) ~ c).map(construct[LiteralGroup])
       }
 
       P( literalGroups.map(toLiteralGroupParser).reduce(_ | _) )
     }
 
     def indexed(p: => Parser[String]) =
-      (Index ~ p).map(Indexed)
+      PP(p).map(construct[Value])
 
     val reference =
       P( idReference.+ separatedBy "." )
@@ -225,7 +230,7 @@ object Parser {
 
     def arguments(`<`: String, `>`: String) = {
       val defaultValue = P(` ` ~ "=" ~ `  ` commit expression)
-      val argument = P( id ~ typeAscription.? ~ defaultValue.? ).map(Argument)
+      val argument = PP( id ~ typeAscription.? ~ defaultValue.? ).map(construct[Argument])
 
       commaSeparated(`<` , argument.* , `>`)
     }
@@ -238,5 +243,8 @@ object Parser {
 
     val typeAscription =
       P( ` `.? ~ ":" ~ ` ` commit noFunctionExpression )
+
+    def PP[T](parser: => Parser[T]) =
+      P(Index ~ parser ~ Index).map { case (start, value, end) => (value, ast.Position(start, end)) }
   }
 }

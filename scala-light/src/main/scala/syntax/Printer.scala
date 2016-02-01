@@ -39,10 +39,8 @@ trait DefaultPrinters {
       "val " + print(x.name) + " [" + print(x.typeArguments) + "]" + print(x.`type`.map(": " + print(_))) + " = " + print(x.body)
     case x: TypeConstructor =>
       "let " + print(x.name) + " [" + print(x.typeArguments) + "] = " + print(x.body)
-    case x: Import.Single =>
-      "import " + print(x.path)
-    case x: Import.Multiple =>
-      "import " + print(x.path) + ".{ " + print(x.parts) + " }"
+    case x: Import =>
+      "import " + print(x.`import`)
     case x: Comment =>
       "//" + print(x.comment)
     case x: Marked =>
@@ -67,7 +65,7 @@ trait DefaultPrinters {
     case x: WhitespaceApplication => "(" + print(x.target) + " " + print(x.method) + " " + print(x.argument) + ")"
   }
   implicit def _04: Printer[Seq[Statement | Expression]] = p(x => "  " + (x map print[Statement | Expression] mkString "\n") replace ("\n", "\n  "))
-  implicit def _05: Printer[Indexed] = p(_.value)
+  implicit def _05: Printer[Value] = p(_.value)
   implicit def _06: Printer[LiteralGroup] = p(x => x.literal + print(x.value) + x.literal)
   implicit def _07: Printer[Seq[Argument]] = p(_ map print[Argument] mkString ", ")
   implicit def _08: Printer[Argument] = p(x => print(x.id) + ": " + print(x.`type`) + print(x.defaultValue.map(" = " + print(_))))
@@ -75,12 +73,18 @@ trait DefaultPrinters {
   implicit def _10: Printer[Extension] = p(x => print(x.id) + " " + print(x.expression))
   implicit def _11: Printer[Shared.Reference] = p(_ map print[IdReference] mkString ".")
   implicit def _12: Printer[IdReference] = p(x => print(x.to) + "[" + print(x.typeApplication map print[Expression] mkString ", ") + "]")
-  implicit def _13: Printer[Seq[Import.Part]] = p(_ map print[Import.Part] mkString ", ")
-  implicit def _14: Printer[Import.Part] = p {
-    case x: Import.As => print(x.original) + " => " + print(x.newId)
-    case x: Import.Id => print(x.id)
+  implicit def _13: Printer[Seq[Import.As | Import.Id]] = p(_ map print[Import.As | Import.Id] mkString ", ")
+  implicit def _14: Printer[Import.As | Import.Id] = p {
+    case Left(x) => print(x.original) + " => " + print(x.newId)
+    case Right(x) => print(x.id)
   }
   implicit def _15: Printer[(Option[Id], Expression)] = p {
     case (id, expression) => print(id.map(" = " + print(_))) + print(expression)
+  }
+  implicit def _16: Printer[Import.Single] = p {
+    x => print(x.path)
+  }
+  implicit def _17: Printer[Import.Multiple] = p {
+    x => print(x.path) + ".{ " + print(x.parts) + " }"
   }
 }
