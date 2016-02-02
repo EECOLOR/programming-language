@@ -2,7 +2,7 @@ package syntax.ast
 
 import Shared._
 
-sealed trait Expression
+sealed trait Expression extends AstNode
 object Expression {
 
   case class Application(target: Expression, argument: Expression)(val position: Position) extends Expression

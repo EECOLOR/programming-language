@@ -23,8 +23,7 @@ trait DefaultPrinters {
   implicit def optionPrinter[A : Printer]: Printer[Option[A]] = p(_ map print[A] getOrElse "")
   implicit def stringPrinter: Printer[String] = p(identity)
 
-  implicit def _01: Printer[Seq[Id]] = p(_ map print[Id] mkString ".")
-  implicit def _02: Printer[Statement] = p {
+  implicit def _00: Printer[AstNode] = p {
     case x: Package =>
       "package " + print(x.path) + "\n" + print(x.body)
     case x: Trait =>
@@ -49,9 +48,6 @@ trait DefaultPrinters {
       print(x.target) + "(" + (x.members map print[Id] mkString ", ") + ") = " + print(x.source)
     case x: UnimplementedMember =>
       print(x.id) + "[" + print(x.typeArguments) + "](" + print(x.arguments) + "): " + print(x.`type`)
-
-  }
-  implicit def _03: Printer[Expression] = p {
     case x: Product => "(" + (x.expressions map print[Expression] mkString ", ") + ")"
     case x: Application => "(" + print(x.target) + ".apply(" + print(x.argument) + "))"
     case x: Block => "{\n" + print(x.body) + "\n}"
@@ -63,28 +59,24 @@ trait DefaultPrinters {
     case x: ProductApplication => "(" + print(x.target) + ".apply(" + (x.arguments map print[Expression] mkString ", ") + "))"
     case x: Expression.Reference => print(x.to)
     case x: WhitespaceApplication => "(" + print(x.target) + " " + print(x.method) + " " + print(x.argument) + ")"
+    case x: Value => x.value
+    case x: LiteralGroup => x.literal + print(x.value) + x.literal
+    case x: Argument => print(x.id) + ": " + print(x.`type`) + print(x.defaultValue.map(" = " + print(_)))
+    case x: Extension => print(x.id) + " " + print(x.expression)
+    case x: IdReference => print(x.to) + "[" + print(x.typeApplication map print[Expression] mkString ", ") + "]"
+    case x: Import.Single => print(x.path)
+    case x: Import.Multiple => print(x.path) + ".{ " + print(x.parts) + " }"
+    case x: Import.As => print(x.original) + " => " + print(x.newId)
+    case x: Import.Id => print(x.id)
   }
+
+  implicit def _01: Printer[Seq[Id]] = p(_ map print[Id] mkString ".")
   implicit def _04: Printer[Seq[Statement | Expression]] = p(x => "  " + (x map print[Statement | Expression] mkString "\n") replace ("\n", "\n  "))
-  implicit def _05: Printer[Value] = p(_.value)
-  implicit def _06: Printer[LiteralGroup] = p(x => x.literal + print(x.value) + x.literal)
   implicit def _07: Printer[Seq[Argument]] = p(_ map print[Argument] mkString ", ")
-  implicit def _08: Printer[Argument] = p(x => print(x.id) + ": " + print(x.`type`) + print(x.defaultValue.map(" = " + print(_))))
   implicit def _09: Printer[Seq[Extension]] = p(x => " " + (x map print[Extension] mkString " "))
-  implicit def _10: Printer[Extension] = p(x => print(x.id) + " " + print(x.expression))
   implicit def _11: Printer[Shared.Reference] = p(_ map print[IdReference] mkString ".")
-  implicit def _12: Printer[IdReference] = p(x => print(x.to) + "[" + print(x.typeApplication map print[Expression] mkString ", ") + "]")
   implicit def _13: Printer[Seq[Import.As | Import.Id]] = p(_ map print[Import.As | Import.Id] mkString ", ")
-  implicit def _14: Printer[Import.As | Import.Id] = p {
-    case Left(x) => print(x.original) + " => " + print(x.newId)
-    case Right(x) => print(x.id)
-  }
   implicit def _15: Printer[(Option[Id], Expression)] = p {
     case (id, expression) => print(id.map(" = " + print(_))) + print(expression)
-  }
-  implicit def _16: Printer[Import.Single] = p {
-    x => print(x.path)
-  }
-  implicit def _17: Printer[Import.Multiple] = p {
-    x => print(x.path) + ".{ " + print(x.parts) + " }"
   }
 }
