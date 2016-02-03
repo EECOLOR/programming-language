@@ -37,7 +37,7 @@ trait DefaultPrinters {
     case x: Val =>
       "val " + print(x.name) + " [" + print(x.typeArguments) + "]" + print(x.`type`.map(": " + print(_))) + " = " + print(x.body)
     case x: TypeConstructor =>
-      "let " + print(x.name) + " [" + print(x.typeArguments) + "] = " + print(x.body)
+      "type " + print(x.name) + " [" + print(x.typeArguments) + "] = " + print(x.body)
     case x: Import =>
       "import " + print(x.`import`)
     case x: Comment =>

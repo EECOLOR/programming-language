@@ -42,7 +42,7 @@ object Parser {
     }
 
     val statement: P[Statement] =
-      P( markedStatement.noCommit | unmarkedStatement )
+      P( markedStatement.noCommit | unmarkedStatement | memberExtraction )
 
     val markedStatement =
       PP( id ~ ` ` ~ unmarkedStatement ).map(construct[Marked])
@@ -52,7 +52,7 @@ object Parser {
         traitStatement   | objectStatement | classStatement |
         valStatement     | defStatement    | letStatement   |
         commentStatement | importStatement |
-        memberExtraction | unimplementedMemberStatement
+        unimplementedMemberStatement
       )
 
     val commentStatement =
@@ -96,7 +96,7 @@ object Parser {
       PP( "def" ~ ` ` commit id ~ typeArguments.? ~ valueArguments.? ~ typeAscription.? ` ` "=" `  ` expression).map(construct[Def])
 
     val letStatement =
-      PP( "let" ~ ` ` commit id ~ typeArguments.? ` ` "=" `  ` expression ).map(construct[TypeConstructor])
+      PP( "type" ~ ` ` commit id ~ typeArguments.? ` ` "=" `  ` expression ).map(construct[TypeConstructor])
 
     val unimplementedMemberStatement =
       PP( (id ~ typeArguments.? ~ valueArguments.? ~ typeAscription).noCommit ~ &(`\n`) ).map(construct[UnimplementedMember])
