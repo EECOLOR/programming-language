@@ -115,13 +115,13 @@ object Parser {
     import ast.Expression._
 
     val expression: P[Expression] =
-      P( function | blockFunction | noFunctionExpression )
+      P( function | noFunctionExpression )
 
     val noFunctionExpression =
       P( noWhitespaceExpression maybeFollowedBy whitespaceApplication)
 
     lazy val noWhitespaceExpression: P[Expression] =
-      P( blockExpression | product | markedLiteralGroup | referenceExpression )
+      P( blockFunction | blockExpression | product | markedLiteralGroup | referenceExpression )
         .maybeFollowedBy(memberAccess, productApplication.noCommit, namedProductApplication, blockFunctionApplication, blockApplication)
 
     val function =
