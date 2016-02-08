@@ -45,7 +45,7 @@ trait DefaultPrinters {
     case x: Marked =>
       "<" + print(x.mark) + "> " + print(x.statement)
     case x: MemberExtraction =>
-      print(x.target) + "(" + (x.members map print[Id] mkString ", ") + ") = " + print(x.source)
+      print(x.target) + "(" + (x.names map print[Id] mkString ", ") + ") = " + print(x.source)
     case x: UnimplementedMember =>
       print(x.id) + "[" + print(x.typeArguments) + "](" + print(x.arguments) + "): " + print(x.`type`)
     case x: Product => "(" + (x.expressions map print[Expression] mkString ", ") + ")"
@@ -56,7 +56,7 @@ trait DefaultPrinters {
     case x: MarkedLiteralGroup => "<" + print(x.mark) + ">" + print(x.literalGroup)
     case x: MemberAccess => "(" + print(x.target) + "." + print(x.member) + ")"
     case x: NamedProductApplication => "(" + print(x.target) + ".apply(" + (x.arguments map print[(Option[Id], Expression)] mkString ", ") + "))"
-    case x: ProductApplication => "(" + print(x.target) + ".apply(" + (x.arguments map print[Expression] mkString ", ") + "))"
+    case x: ProductApplication => "(" + print(x.target) + ".apply" + print(x.product) + ")"
     case x: Expression.Reference => print(x.to)
     case x: WhitespaceApplication => "(" + print(x.target) + " " + print(x.method) + " " + print(x.argument) + ")"
     case x: Value => x.value

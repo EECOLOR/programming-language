@@ -146,7 +146,7 @@ object Parser {
       PP( ` ` ~ idReference ~ `  ` commit noWhitespaceExpression ).map(construct[Expression => WhitespaceApplication])
 
     val productApplication =
-      PP( ` `.? ~ commaSeparated("(" , expression.* , ")") )
+      PP( ` `.? ~ product )
         .map(construct[Expression => ProductApplication])
 
     val namedProductApplication =

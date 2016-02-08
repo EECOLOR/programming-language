@@ -13,7 +13,7 @@ object Expression {
   case class MemberAccess(target: Expression, member: IdReference)(val position: Position) extends Expression
   case class NamedProductApplication(target: Expression, arguments: Seq[(Option[Id], Expression)])(val position: Position) extends Expression
   case class Product(expressions: Seq[Expression])(val position: Position) extends Expression
-  case class ProductApplication(target: Expression, arguments: Seq[Expression])(val position: Position) extends Expression
+  case class ProductApplication(target: Expression, product: Product)(val position: Position) extends Expression
   case class Reference(to: Shared.Reference)(val position: Position) extends Expression
   case class WhitespaceApplication(target: Expression, method: IdReference, argument: Expression)(val position: Position) extends Expression
 }

@@ -31,5 +31,5 @@ object Statement {
   case class TypeConstructor(name: Id, typeArguments: Seq[Argument], body: Expression)(val position: Position) extends Statement
   case class UnimplementedMember(id: Id, typeArguments: Seq[Argument], arguments:Seq[Argument], `type`: Expression)(val position: Position) extends Statement
 
-  case class MemberExtraction(target: Option[Reference], members: Seq[Id], source: Expression)(val position: Position) extends Statement
+  case class MemberExtraction(target: Option[Reference], names: Seq[Id], source: Expression)(val position: Position) extends Statement
 }

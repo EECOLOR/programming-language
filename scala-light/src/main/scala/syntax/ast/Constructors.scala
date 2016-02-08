@@ -111,9 +111,9 @@ object Constructors {
   }
 
   implicit object ProductApplicationConstructor extends Positioned[Expression => ProductApplication] {
-    type From = Seq[Expression]
-    val construct: From => To = { case (arguments) =>
-      position => target => ProductApplication(target, arguments)(position)
+    type From = Product
+    val construct: From => To = { case (product) =>
+      position => target => ProductApplication(target, product)(position)
     }
   }
 
