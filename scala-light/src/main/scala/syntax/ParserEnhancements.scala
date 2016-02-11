@@ -20,10 +20,10 @@ class ParserEnhancements(
     def commit[B, C](other: Parser[B])(implicit ev: Sequencer[A, B, C]) = parser ~/ other
     def commit = parser.~/
 
-    class * extends ParserWithSeparator[A](parser, min = 0)
+    class * extends ZeroOrMoreWithSeparator(parser)
     object * extends *
 
-    class + extends ParserWithSeparator(parser, min = 1)
+    class + extends OneOrMoreWithSeparator(parser)
     object + extends +
 
     def maybeFollowedBy[B >: A](parsers: Parser[B => B] *): Parser[B] = {
@@ -39,14 +39,24 @@ class ParserEnhancements(
   }
 
   trait Separator[A] {
-    def separatedBy[B](separator: Parser[B]): Parser[Seq[A]]
+    def separatedBy[B](separator: Parser[B]): Parser[A]
   }
 
-  class ParserWithSeparator[A](parser: Parser[A], min: Int)extends Parser[Seq[A]] with Separator[A] {
+  class ZeroOrMoreWithSeparator[A](parser: Parser[A]) extends Parser[Seq[A]] with Separator[Seq[A]] {
     def parseRec(cfg: ParseCtx, index: Int) =
-      parser.rep(min).parseRec(cfg, index)
+      parser.rep().parseRec(cfg, index)
 
     def separatedBy[B](separator: Parser[B]): Parser[Seq[A]] =
-      parser.rep(min, sep = separator)
+      parser.rep(sep = separator)
+  }
+
+  class OneOrMoreWithSeparator[A](parser: Parser[A]) extends Parser[(A, Seq[A])] with Separator[(A, Seq[A])] {
+    private val toPair: Seq[A] => (A, Seq[A]) = { case Seq(a, rest @ _*) => (a, rest) }
+
+    def parseRec(cfg: ParseCtx, index: Int) =
+      parser.rep(min = 1).map(toPair).parseRec(cfg, index)
+
+    def separatedBy[B](separator: Parser[B]): Parser[(A, Seq[A])] =
+      parser.rep(min = 1, sep = separator).map(toPair)
   }
 }

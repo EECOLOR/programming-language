@@ -1,5 +1,8 @@
 package syntax
 
+import syntax.UsefulDataTypes.|
+import syntax.UsefulDataTypes.NonEmptySeq
+
 class Printer[-T](val print: T => String) extends (T => String) {
   def apply(t: T) = print(t)
 }
@@ -45,7 +48,7 @@ trait DefaultPrinters {
     case x: Marked =>
       "<" + print(x.mark) + "> " + print(x.statement)
     case x: MemberExtraction =>
-      print(x.target) + "(" + (x.names map print[Id] mkString ", ") + ") = " + print(x.source)
+      print(x.target) + "(" + (x.names.toSeq map print[Id] mkString ", ") + ") = " + print(x.source)
     case x: UnimplementedMember =>
       print(x.id) + "[" + print(x.typeArguments) + "](" + print(x.arguments) + "): " + print(x.`type`)
     case x: Product => "(" + (x.expressions map print[Expression] mkString ", ") + ")"
@@ -70,12 +73,12 @@ trait DefaultPrinters {
     case x: Import.Id => print(x.id)
   }
 
-  implicit def _01: Printer[Seq[Id]] = p(_ map print[Id] mkString ".")
+  implicit def _01: Printer[NonEmptySeq[Id]] = p(_.toSeq map print[Id] mkString ".")
   implicit def _04: Printer[Seq[Statement | Expression]] = p(x => "  " + (x map print[Statement | Expression] mkString "\n") replace ("\n", "\n  "))
   implicit def _07: Printer[Seq[Argument]] = p(_ map print[Argument] mkString ", ")
   implicit def _09: Printer[Seq[Extension]] = p(x => " " + (x map print[Extension] mkString " "))
-  implicit def _11: Printer[Shared.Reference] = p(_ map print[IdReference] mkString ".")
-  implicit def _13: Printer[Seq[Import.As | Import.Id]] = p(_ map print[Import.As | Import.Id] mkString ", ")
+  implicit def _11: Printer[Shared.Reference] = p(_.toSeq map print[IdReference] mkString ".")
+  implicit def _13: Printer[NonEmptySeq[Import.As | Import.Id]] = p(_.toSeq map print[Import.As | Import.Id] mkString ", ")
   implicit def _15: Printer[(Option[Id], Expression)] = p {
     case (id, expression) => print(id.map(" = " + print(_))) + print(expression)
   }

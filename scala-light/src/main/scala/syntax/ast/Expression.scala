@@ -1,5 +1,7 @@
 package syntax.ast
 
+import syntax.UsefulDataTypes.|
+import syntax.UsefulDataTypes.NonEmptySeq
 import Shared._
 
 sealed trait Expression extends AstNode

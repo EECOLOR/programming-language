@@ -1,5 +1,8 @@
 package syntax.ast
 
+import syntax.UsefulDataTypes.|
+import syntax.UsefulDataTypes.NonEmptySeq
+
 abstract class Constructor[A] {
   type From
   type To = A
@@ -42,6 +45,11 @@ object Constructors {
   class Positioned3[A, B, C, T](constructor: (A, B, C) => Position => T) extends Positioned[T] {
     type From = (A, B, C)
     val construct: From => To = { case (a, b, c) => constructor(a, b, c) }
+  }
+
+  implicit def NonEmptySeqConstructor[A] = new Constructor[NonEmptySeq[A]] {
+    type From = (A, Seq[A])
+    val construct: From => To = { case (a, b) => NonEmptySeq(a, b) }
   }
 
   implicit object ClassConstructor extends Positioned[Class] {
@@ -139,16 +147,16 @@ object Constructors {
   }
 
   implicit object PackageConstructor extends Positioned[Package] {
-    type From = (Option[Seq[Id]], Seq[Statement | Expression])
+    type From = (Option[(Id, Seq[Id])], Seq[Statement | Expression])
     val construct: From => To = { case (path, body) =>
-      Package(path getOrElse Seq.empty, body)
+      Package(path.map(Constructors.construct[NonEmptySeq[Id]]), body)
     }
   }
 
   implicit object IdReferenceConstructor extends Positioned[IdReference] {
-    type From = (Id, Option[Seq[Expression]])
+    type From = (Id, Option[(Expression, Seq[Expression])])
     val construct: From => To = { case (id, typeApplication) =>
-      IdReference(id, typeApplication getOrElse Seq.empty)
+      IdReference(id, typeApplication map { case (head, tail) => head +: tail } getOrElse Seq.empty)
     }
   }
 
@@ -180,18 +188,18 @@ object Constructors {
     }
   }
 
-  implicit object ValueConstructor              extends Positioned1(Value.apply)
-  implicit object LiteralGroupConstructor       extends Positioned2(LiteralGroup.apply)
-  implicit object MemberExtractionConstructor   extends Positioned3(MemberExtraction.apply)
-  implicit object CommentConstructor            extends Positioned1(Comment.apply)
-  implicit object ImportIdConstructor           extends Positioned1(Import.Id.apply)
-  implicit object ProductConstructor            extends Positioned1(Product.apply)
-  implicit object ReferenceConstructor          extends Positioned1(Expression.Reference.apply)
-  implicit object MarkedLiteralGroupConstructor extends Positioned2(MarkedLiteralGroup.apply)
-  implicit object ImportAsConstructor           extends Positioned2(Import.As.apply)
-  implicit object MarkedConstructor             extends Positioned2(Marked.apply)
-  implicit object ImportConstructor             extends Positioned1(Import.apply)
-  implicit object ImportSingleConstructor       extends Positioned1(Import.Single.apply)
-  implicit object ImportMultipleConstructor     extends Positioned2(Import.Multiple.apply)
-  implicit object ExtensionConstructor          extends Positioned2(Extension.apply)
+  implicit object ValueConstructor               extends Positioned1(Value.apply)
+  implicit object LiteralGroupConstructor        extends Positioned2(LiteralGroup.apply)
+  implicit object MemberExtractionConstructor    extends Positioned3(MemberExtraction.apply)
+  implicit object CommentConstructor             extends Positioned1(Comment.apply)
+  implicit object ImportIdConstructor            extends Positioned1(Import.Id.apply)
+  implicit object ProductConstructor             extends Positioned1(Product.apply)
+  implicit object ReferenceExpressionConstructor extends Positioned1(Expression.Reference.apply)
+  implicit object MarkedLiteralGroupConstructor  extends Positioned2(MarkedLiteralGroup.apply)
+  implicit object ImportAsConstructor            extends Positioned2(Import.As.apply)
+  implicit object MarkedConstructor              extends Positioned2(Marked.apply)
+  implicit object ImportConstructor              extends Positioned1(Import.apply)
+  implicit object ImportSingleConstructor        extends Positioned1(Import.Single.apply)
+  implicit object ImportMultipleConstructor      extends Positioned2(Import.Multiple.apply)
+  implicit object ExtensionConstructor           extends Positioned2(Extension.apply)
 }

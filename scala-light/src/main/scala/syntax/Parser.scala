@@ -1,6 +1,7 @@
 package syntax
 
 import fastparse.all._
+
 /*
  * Statements vs Expressions
  * Declaration vs Invocation
@@ -36,6 +37,9 @@ object Parser {
     import ast.Expression
     import ast.Statement
     import ast.Statement._
+    import syntax.UsefulDataTypes.|
+    import syntax.UsefulDataTypes.NonEmptySeq
+    import syntax.ast.Shared.Id
 
     val `package` = {
       PP( ("package" ~ ` ` commit (id.+ separatedBy ".") ~ `\n`).? ~ body ~ `\n` ~ End ).map(construct[Package])
@@ -65,10 +69,11 @@ object Parser {
         PP( reference ).map(construct[Import.Single])
 
       val importMultiple = {
-        val importId = PP( id ).map(construct[Import.Id])
-        val importAs = PP( id.noCommit ` ` "=>" ` ` id ).map(construct[Import.As])
+        val importId = PP( idReference ).map(construct[Import.Id])
+        val importAs = PP( idReference.noCommit ` ` "=>" ` ` id ).map(construct[Import.As])
+        val parts = P( commaSeparated("{" , (importAs | importId).+ , "}") ).map(construct[NonEmptySeq[Import.As | Import.Id]])
 
-        PP( reference ~ "." ~ commaSeparated("{" , (importAs | importId).+ , "}") ).map(construct[Import.Multiple])
+        PP( reference ~ "." ~ parts ).map(construct[Import.Multiple])
       }
 
       PP( "import" ~ ` ` commit (importMultiple | importSingle) ).map(construct[Import])
@@ -101,8 +106,10 @@ object Parser {
     val unimplementedMemberStatement =
       PP( (id ~ typeArguments.? ~ valueArguments.? ~ typeAscription).noCommit ~ &(`\n`) ).map(construct[UnimplementedMember])
 
-    val memberExtraction =
-      PP( reference.noCommit.? ~ ` `.? ~ commaSeparated("(" , id.+ , ")").noCommit ` ` "=" ~ `  ` commit  expression).map(construct[MemberExtraction])
+    val memberExtraction = {
+      val names = P( commaSeparated("(" , id.+ , ")") ).map(construct[NonEmptySeq[Id]])
+      PP( reference.noCommit.? ~ ` `.? ~ names.noCommit ` ` "=" ~ `  ` commit  expression).map(construct[MemberExtraction])
+    }
 
     val typeArguments =
       P( ` `.? ~ arguments("[", "]") )
@@ -115,10 +122,7 @@ object Parser {
     import ast.Expression._
 
     val expression: P[Expression] =
-      P( function | noFunctionExpression )
-
-    val noFunctionExpression =
-      P( noWhitespaceExpression maybeFollowedBy whitespaceApplication)
+      P( function | noWhitespaceExpression maybeFollowedBy whitespaceApplication)
 
     lazy val noWhitespaceExpression: P[Expression] =
       P( blockFunction | blockExpression | product | markedLiteralGroup | referenceExpression )
@@ -178,7 +182,6 @@ object Parser {
 
     import statements.statement
     import expressions.expression
-    import expressions.noFunctionExpression
 
     val body = {
       import AlternativeParserBehavior.OrToEither
@@ -220,7 +223,7 @@ object Parser {
       PP(p).map(construct[Value])
 
     val reference =
-      P( idReference.+ separatedBy "." )
+      P( idReference.+ separatedBy "." ).map(construct[Reference])
 
     val block =
       group("{" , body.? , "}")
@@ -235,14 +238,14 @@ object Parser {
       commaSeparated(`<` , argument.* , `>`)
     }
 
-    def commaSeparated[A](`<`: String, body: Parser[Seq[A]] with Separator[A], `>`: String) =
+    def commaSeparated[A](`<`: String, body: Parser[A] with Separator[A], `>`: String) =
       group(`<` , body separatedBy `,` , `>`)
 
     def group[A](`<`: String, body: Parser[A], `>`: String) =
       P( `<` commit ` \n`.? ~ body ~ ` \n`.? ~ `>` )
 
     val typeAscription =
-      P( ` `.? ~ ":" ~ ` ` commit noFunctionExpression )
+      P( ` `.? ~ ":" ~ ` ` commit expression )
 
     def PP[T](parser: => Parser[T]) =
       P(Index ~ parser ~ Index).map { case (start, value, end) => (value, ast.Position(start, end)) }
