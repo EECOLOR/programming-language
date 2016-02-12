@@ -1,5 +1,6 @@
 package syntax.processor
 
+import syntax.Processor
 import syntax.UsefulDataTypes.|
 import syntax.ast.AstNode
 import syntax.ast.{ Expression => AstExpression }
@@ -29,7 +30,7 @@ object ExpressionProcessor {
   import StatementProcessor.{ processor => statementProcessor }
 
   implicit val processor:
-    Processor[AstExpression] { type ResultType = Expression } = P {
+    AstExpression -> Expression = P {
       case x @ AstReferenceExpression(to) =>
         for {
           reference <- process(to)
@@ -95,7 +96,7 @@ object ExpressionProcessor {
     }
 
   private implicit val processNamedArguments:
-    Processor[(Option[AstId], AstExpression)] { type ResultType = (Option[Id], Expression) } = P {
+    (Option[AstId], AstExpression) -> (Option[Id], Expression) = P {
       case (id, expression) =>
         for {
           newExpression <- process(expression)

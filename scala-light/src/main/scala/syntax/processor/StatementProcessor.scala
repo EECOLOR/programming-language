@@ -2,6 +2,7 @@ package syntax.processor
 
 import syntax.CompilationError
 import syntax.Empty.empty
+import syntax.Processor
 import syntax.Result
 import syntax.UsefulDataTypes.|
 import syntax.UsefulDataTypes.NonEmptySeq
@@ -37,7 +38,7 @@ object StatementProcessor {
   import Statement._
 
   implicit val processor:
-    Processor[AstStatement] { type ResultType = Statement } = P {
+    AstStatement -> Statement = P {
       case x @ AstPackage(path, body) =>
         for {
           newBody <- withoutUnimplementedMember(body)
@@ -128,7 +129,7 @@ object StatementProcessor {
     }
 
   private implicit val multipleImportsProcessor:
-    Processor[AstImport.Multiple] { type ResultType = NonEmptySeq[ImportAs | Import] } = P {
+    AstImport.Multiple -> NonEmptySeq[ImportAs | Import] = P {
       case AstImport.Multiple(base, parts) =>
         val imports = parts.map((base, _))
 
@@ -138,7 +139,7 @@ object StatementProcessor {
     }
 
   private implicit val importsProcessor:
-    Processor[(AstReference, AstImport.As | AstImport.Id)] { type ResultType = ImportAs | Import } = P {
+    (AstReference, AstImport.As | AstImport.Id) -> (ImportAs | Import) = P {
       case (base, Left(x @ AstImport.As(idRef, id))) =>
         for {
           newRef <- process(base :+ idRef)
@@ -151,7 +152,7 @@ object StatementProcessor {
     }
 
   private def argumentAsUnimplementedMember:
-    Processor[AstArgument] { type ResultType = Option[UnimplementedMember] } = P {
+    AstArgument -> Option[UnimplementedMember] = P {
       case x @ AstArgument(_, Some(tpe), _) =>
         for {
           Argument(name, Some(tpe)) <- process(x)

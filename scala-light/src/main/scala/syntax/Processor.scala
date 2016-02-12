@@ -1,9 +1,11 @@
-package syntax.processor
+package syntax
 
-import syntax.Empty.empty
-import syntax.Result
-import syntax.UsefulDataTypes.|
-import syntax.UsefulDataTypes.NonEmptySeq
+import Empty.empty
+import UsefulDataTypes.{
+  |,
+  NonEmptySeq
+}
+import scala.language.implicitConversions
 
 trait Processor[-A] {
   type ResultType
@@ -21,7 +23,8 @@ object Processor extends DefaultProcessors {
   def process[A](ast: A)(implicit processor: Processor[A]): Result[processor.ResultType] =
     processor process ast
 
-  def P[A, B](f: A => Result[B]): Processor[A] { type ResultType = B } =
+  type ->[A, B] = Processor[A] { type ResultType = B }
+  def P[A, B](f: A => Result[B]): A -> B =
     new Processor[A] {
       type ResultType = B
       val process = f
@@ -33,12 +36,12 @@ trait DefaultProcessors {
   import Processor._
 
   implicit def coproductProcessor[A, B](implicit left: Processor[A], right: Processor[B]):
-    Processor[A | B] { type ResultType = left.ResultType | right.ResultType } = P {
+    (A | B) -> (left.ResultType | right.ResultType) = P {
       _.fold(left process _ map injectLeft, right process _ map injectRight)
     }
 
   implicit def productProcessor[A, B](implicit first: Processor[A], second: Processor[B]):
-    Processor[(A, B)] { type ResultType = (first.ResultType, second.ResultType) } = P {
+    (A, B) -> (first.ResultType, second.ResultType) = P {
       case (a, b) => for {
         newA <- first process a
         newB <- second process b
@@ -46,12 +49,12 @@ trait DefaultProcessors {
     }
 
   implicit def optionProcessor[A](implicit processor: Processor[A]):
-    Processor[Option[A]] { type ResultType = Option[processor.ResultType] } = P {
+    Option[A] -> Option[processor.ResultType] = P {
       _.map(processor process _ map (Option(_))).getOrElse(Result(None, empty))
     }
 
   implicit def seqProcessor[A](implicit processor: Processor[A]):
-    Processor[Seq[A]] { type ResultType = Seq[processor.ResultType] } = P {
+    Seq[A] -> Seq[processor.ResultType] = P {
       _.map(processor.process).foldLeft(Result(Seq.empty[processor.ResultType], empty)) {
         (result, element) =>
           for {
@@ -62,7 +65,7 @@ trait DefaultProcessors {
     }
 
   implicit def nonEmptySeqProcessor[A](implicit processor: Processor[A]):
-    Processor[NonEmptySeq[A]] { type ResultType = NonEmptySeq[processor.ResultType] } = P {
+    NonEmptySeq[A] -> NonEmptySeq[processor.ResultType] = P {
       _.map(processor.process).foldLeft(_.map(NonEmptySeq(_, empty))) {
         (result, element) =>
           for {

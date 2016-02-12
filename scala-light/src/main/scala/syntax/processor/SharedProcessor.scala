@@ -2,6 +2,7 @@ package syntax.processor
 
 import syntax.CompilationError
 import syntax.Empty.empty
+import syntax.Processor
 import syntax.Result
 import syntax.UsefulDataTypes.|
 import syntax.ast.Shared.{
@@ -29,12 +30,12 @@ object SharedProcessor {
   }
 
   implicit val processAstId:
-    Processor[AstId] { type ResultType = Id } = P {
+    AstId -> Id = P {
       asId andThen (Result(_))
     }
 
   implicit val processReference:
-    Processor[AstReference] { type ResultType = Reference | MemberAccess } = P {
+    AstReference -> (Reference | MemberAccess) = P {
       _
         .map(processIdReference.process)
         .foldLeft(_ map[Reference | MemberAccess] injectLeft) {
@@ -47,7 +48,7 @@ object SharedProcessor {
     }
 
   val processIdReference:
-    Processor[AstIdReference] { type ResultType = Reference } = P {
+    AstIdReference -> Reference = P {
       case x @ AstIdReference(to, typeArguments) =>
         for {
           newTypeArguments <- process(typeArguments)
@@ -55,7 +56,7 @@ object SharedProcessor {
     }
 
   implicit val processArgument:
-    Processor[AstArgument] { type ResultType = Argument } = P {
+    AstArgument -> Argument = P {
       case x @ AstArgument(name, tpe, defaultValue) =>
         val newArgument =
           for {
