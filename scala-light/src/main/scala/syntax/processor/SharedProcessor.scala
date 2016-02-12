@@ -1,5 +1,9 @@
 package syntax.processor
 
+import syntax.CompilationError
+import syntax.Empty.empty
+import syntax.Result
+import syntax.UsefulDataTypes.|
 import syntax.ast.Shared.{
   Id => AstId,
   Value => AstValue,
@@ -8,7 +12,6 @@ import syntax.ast.Shared.{
   Reference => AstReference,
   IdReference => AstIdReference
 }
-import syntax.UsefulDataTypes.|
 
 object SharedProcessor {
 

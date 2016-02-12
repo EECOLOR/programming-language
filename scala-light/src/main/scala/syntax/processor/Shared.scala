@@ -1,7 +1,7 @@
 package syntax.processor
 
-import syntax.ast.AstNode
 import syntax.UsefulDataTypes.|
+import syntax.ast.AstNode
 
 object Shared {
   type Id = Value | LiteralGroup

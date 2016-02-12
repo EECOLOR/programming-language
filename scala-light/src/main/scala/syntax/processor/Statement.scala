@@ -1,8 +1,8 @@
 package syntax.processor
 
-import syntax.ast.AstNode
 import syntax.UsefulDataTypes.|
 import syntax.UsefulDataTypes.NonEmptySeq
+import syntax.ast.AstNode
 
 trait Statement extends ProcessedAstNode
 object Statement {

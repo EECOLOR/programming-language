@@ -1,7 +1,7 @@
 package syntax.processor
 
-import syntax.ast.AstNode
 import syntax.UsefulDataTypes.|
+import syntax.ast.AstNode
 
 trait Expression extends ProcessedAstNode
 object Expression {

@@ -1,5 +1,10 @@
 package syntax.processor
 
+import syntax.CompilationError
+import syntax.Empty.empty
+import syntax.Result
+import syntax.UsefulDataTypes.|
+import syntax.UsefulDataTypes.NonEmptySeq
 import syntax.ast.{ Expression => AstExpression }
 import syntax.ast.{  Statement => AstStatement  }
 import syntax.ast.Statement.{
@@ -21,8 +26,6 @@ import syntax.ast.Shared.{
    Argument => AstArgument,
   Reference => AstReference
 }
-import syntax.UsefulDataTypes.|
-import syntax.UsefulDataTypes.NonEmptySeq
 
 object StatementProcessor {
 

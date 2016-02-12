@@ -1,11 +1,13 @@
 package syntax.processor
 
+import syntax.Empty.empty
+import syntax.Result
 import syntax.UsefulDataTypes.|
 import syntax.UsefulDataTypes.NonEmptySeq
 
 trait Processor[-A] {
   type ResultType
-  val process: A => Processor.Result[ResultType]
+  val process: A => Result[ResultType]
 }
 object Processor extends DefaultProcessors {
 
@@ -24,40 +26,6 @@ object Processor extends DefaultProcessors {
       type ResultType = B
       val process = f
     }
-
-  case class Result[A](val value: A, val errors: Seq[CompilationError]) {
-
-    def map[B](f: A => B): Result[B] = Result(f(value), errors)
-
-    def flatMap[B](f: A => Result[B]): Result[B] = {
-      val result = f(value)
-      Result(result.value, errors ++ result.errors)
-    }
-
-    def withError(error: CompilationError): Result[A] =
-      Result(value, errors :+ error)
-
-    def withErrors[B >: A](newErrors: Seq[CompilationError]): Result[B] =
-      Result(value, errors ++ newErrors)
-
-    // for member extraction
-    def withFilter(f: A => Boolean): Result[A] = this
-  }
-  object Result {
-    def apply[A](value: A): Result[A] = Result(value, empty)
-    def apply[A](value: A, error: CompilationError): Result[A] = Result(value, Seq(error))
-    def apply[A](error: CompilationError)(implicit empty: Empty[A]): Result[A] = Result(empty.value, Seq(error))
-  }
-
-  def empty[A](implicit empty: Empty[A]): A = empty.value
-
-  class Empty[A](val value: A)
-  object Empty extends LowerPriorityEmpty {
-    implicit def forSeq[A]: Empty[Seq[A]] = new Empty(Seq.empty)
-  }
-  trait LowerPriorityEmpty {
-    implicit def forOption[A]: Empty[Option[A]] = new Empty(None)
-  }
 }
 
 trait DefaultProcessors {

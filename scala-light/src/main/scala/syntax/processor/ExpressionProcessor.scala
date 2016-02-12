@@ -1,5 +1,6 @@
 package syntax.processor
 
+import syntax.UsefulDataTypes.|
 import syntax.ast.AstNode
 import syntax.ast.{ Expression => AstExpression }
 import syntax.ast.Expression.{
@@ -18,7 +19,6 @@ import syntax.ast.Shared.{
            Id => AstId,
   IdReference => AstIdReference
 }
-import syntax.UsefulDataTypes.|
 
 object ExpressionProcessor {
 

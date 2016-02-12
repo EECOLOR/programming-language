@@ -1,6 +1,7 @@
-package syntax.processor
+package syntax
 
 import syntax.ast.AstNode
+import syntax.processor.ProcessedAstNode
 
 case class CompilationError(message: String, ast: AstNode) extends ProcessedAstNode
 
