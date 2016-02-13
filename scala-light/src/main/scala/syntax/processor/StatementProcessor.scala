@@ -43,12 +43,7 @@ object StatementProcessor {
         for {
           newBody <- withoutUnimplementedMember(body)
           newPath <- process(path)
-        } yield newPath match {
-          case None =>
-            RootPackage(newBody)(x)
-          case Some(path) =>
-            Package(path, newBody)(x)
-        }
+        } yield Package(newPath, newBody)(x)
 
       case x @ AstObject(name, typeArguments, extensions, body) =>
         val `object` =
@@ -167,10 +162,12 @@ object StatementProcessor {
     } yield processedArguments.flatten
 
   private def withoutUnimplementedMember(body: Seq[AstStatement | AstExpression]) =
-    body.foldLeft(Result(Seq.empty[Statement | Expression], empty)) {
+    body.foldLeft(Result(Seq.empty[Statement], empty)) {
       case (result, Left(x: AstUnimplementedMember)) =>
         result withError NoUnimplementedMembersInObjectError(x)
-      case (result, x) =>
+      case (result, Right(x)) =>
+        result withError UnexpectedExpressionInStatementPosition(x)
+      case (result, Left(x)) =>
         for {
           body      <- result
           processed <- process(x)
@@ -178,7 +175,7 @@ object StatementProcessor {
     }
 
   private def separateUnimplementedMembersFrom(body: Seq[AstStatement | AstExpression]) =
-    body.foldLeft(Result((Seq.empty[UnimplementedMember], Seq.empty[Statement | Expression]), empty)) {
+    body.foldLeft(Result((Seq.empty[UnimplementedMember], Seq.empty[Statement]), empty)) {
       case (result, Left(x @ AstUnimplementedMember(name, typeArguments, arguments, tpe))) =>
         for {
           (unimplementedMembers, body) <- result
@@ -187,7 +184,9 @@ object StatementProcessor {
           newTpe                       <- process(tpe)
           newUnimplementedMember = UnimplementedMember(name, processedTypeArguments, processedArguments, newTpe)(x)
         } yield (unimplementedMembers :+ newUnimplementedMember, body)
-      case (result, x) =>
+      case (result, Right(x)) =>
+        result withError UnexpectedExpressionInStatementPosition(x)
+      case (result, Left(x)) =>
         for {
           (unimplementedMembers, body) <- result
           element                      <- process(x)

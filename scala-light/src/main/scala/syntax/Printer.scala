@@ -73,7 +73,7 @@ trait DefaultPrinters {
     case x: Import.Id => print(x.id)
   }
 
-  implicit def _01: Printer[NonEmptySeq[Id]] = p(_.toSeq map print[Id] mkString ".")
+  implicit def _01: Printer[Seq[Id]] = p(_.toSeq map print[Id] mkString ".")
   implicit def _04: Printer[Seq[Statement | Expression]] = p(x => "  " + (x map print[Statement | Expression] mkString "\n") replace ("\n", "\n  "))
   implicit def _07: Printer[Seq[Argument]] = p(_ map print[Argument] mkString ", ")
   implicit def _09: Printer[Seq[Extension]] = p(x => " " + (x map print[Extension] mkString " "))

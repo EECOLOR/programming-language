@@ -21,4 +21,7 @@ object CompilationError {
 
   def UnexpectedUnimplementedMember(x: AstNode) =
     CompilationError("Did not expect and unimplemented member in this position", x)
+
+  def UnexpectedExpressionInStatementPosition(x: AstNode) =
+    CompilationError("Did not expect an expression here, expected statement", x)
 }

@@ -149,7 +149,7 @@ object Constructors {
   implicit object PackageConstructor extends Positioned[Package] {
     type From = (Option[(Id, Seq[Id])], Seq[Statement | Expression])
     val construct: From => To = { case (path, body) =>
-      Package(path.map(Constructors.construct[NonEmptySeq[Id]]), body)
+      Package(path.fold(Seq.empty[Id]) { case (head, tail) => head +: tail }, body)
     }
   }
 

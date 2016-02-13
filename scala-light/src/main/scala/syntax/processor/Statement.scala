@@ -10,14 +10,13 @@ object Statement {
   import Shared._
   import Expression.{ Reference, MemberAccess }
 
-  case class RootPackage(body: Seq[Statement | Expression])(val ast: AstNode) extends Statement
-  case class Package(path: NonEmptySeq[Id], body: Seq[Statement | Expression])(val ast: AstNode) extends Statement
+  case class Package(path: Seq[Id], body: Seq[Statement])(val ast: AstNode) extends Statement
 
   case class MarkedStatement(mark: Id, statement: Statement)(val ast: AstNode) extends Statement
 
-  case class Trait(name: Id, typeArguments: Seq[Argument], arguments: Seq[Argument], unimplementedMembers: Seq[UnimplementedMember], body: Seq[Statement | Expression])(val ast: AstNode) extends Statement
-  case class Object(name: Id, typeArguments: Seq[Argument], body: Seq[Statement | Expression])(val ast: AstNode) extends Statement
-  case class Class(name: Id, typeArguments: Seq[Argument], unimplementedMembers: Seq[UnimplementedMember], body: Seq[Statement | Expression])(val ast: AstNode) extends Statement
+  case class Trait(name: Id, typeArguments: Seq[Argument], arguments: Seq[Argument], unimplementedMembers: Seq[UnimplementedMember], body: Seq[Statement])(val ast: AstNode) extends Statement
+  case class Object(name: Id, typeArguments: Seq[Argument], body: Seq[Statement])(val ast: AstNode) extends Statement
+  case class Class(name: Id, typeArguments: Seq[Argument], unimplementedMembers: Seq[UnimplementedMember], body: Seq[Statement])(val ast: AstNode) extends Statement
 
   case class Def(name: Id, typeArguments: Seq[Argument], arguments: Seq[Argument], `type`: Option[Expression], body: Expression)(val ast: AstNode) extends Statement
   case class Val(name: Id, typeArguments: Seq[Argument], `type`: Option[Expression], body: Expression)(val ast: AstNode) extends Statement

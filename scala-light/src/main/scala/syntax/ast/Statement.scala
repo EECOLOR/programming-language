@@ -8,7 +8,7 @@ import Shared._
 sealed trait Statement extends AstNode
 object Statement {
 
-  case class Package(path: Option[NonEmptySeq[Id]], body: Seq[Statement | Expression])(val position: Position) extends Statement
+  case class Package(path: Seq[Id], body: Seq[Statement | Expression])(val position: Position) extends Statement
 
   case class Marked(mark: Id, statement: Statement)(val position: Position) extends Statement
 
