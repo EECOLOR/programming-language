@@ -23,6 +23,7 @@ import syntax.ast.Shared.{
 
 object ExpressionProcessor {
 
+  import Shared.context._
   import Shared.Id
   import Processor._
   import Expression._

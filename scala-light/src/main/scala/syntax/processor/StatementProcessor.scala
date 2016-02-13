@@ -1,6 +1,5 @@
 package syntax.processor
 
-import syntax.CompilationError
 import syntax.Empty.empty
 import syntax.Processor
 import syntax.Result
@@ -34,6 +33,7 @@ object StatementProcessor {
   import ExpressionProcessor.{ processor => expressionProcessor }
   import Processor._
   import Shared.Argument
+  import Shared.context._
   import SharedProcessor._
   import Statement._
 
@@ -162,7 +162,7 @@ object StatementProcessor {
     } yield processedArguments.flatten
 
   private def withoutUnimplementedMember(body: Seq[AstStatement | AstExpression]) =
-    body.foldLeft(Result(Seq.empty[Statement], empty)) {
+    body.foldLeft(Result(Seq.empty[Statement], Seq.empty[CompilationError])) {
       case (result, Left(x: AstUnimplementedMember)) =>
         result withError NoUnimplementedMembersInObjectError(x)
       case (result, Right(x)) =>
@@ -175,7 +175,7 @@ object StatementProcessor {
     }
 
   private def separateUnimplementedMembersFrom(body: Seq[AstStatement | AstExpression]) =
-    body.foldLeft(Result((Seq.empty[UnimplementedMember], Seq.empty[Statement]), empty)) {
+    body.foldLeft(Result((Seq.empty[UnimplementedMember], Seq.empty[Statement]), Seq.empty[CompilationError])) {
       case (result, Left(x @ AstUnimplementedMember(name, typeArguments, arguments, tpe))) =>
         for {
           (unimplementedMembers, body) <- result

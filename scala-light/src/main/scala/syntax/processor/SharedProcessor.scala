@@ -1,6 +1,5 @@
 package syntax.processor
 
-import syntax.CompilationError
 import syntax.Empty.empty
 import syntax.Processor
 import syntax.Result
@@ -21,6 +20,7 @@ object SharedProcessor {
   import ExpressionProcessor.processor
   import Processor._
   import Shared._
+  import Shared.context._
 
   implicit val asId: AstId => Id = {
     case Left(x @ AstValue(value)) =>

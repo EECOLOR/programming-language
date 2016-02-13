@@ -1,9 +1,8 @@
-package syntax
+package syntax.processor
 
 import syntax.ast.AstNode
-import syntax.processor.ProcessedAstNode
 
-case class CompilationError(message: String, ast: AstNode) extends ProcessedAstNode
+case class CompilationError(message: String, ast: AstNode)
 
 object CompilationError {
 
@@ -22,6 +21,6 @@ object CompilationError {
   def UnexpectedUnimplementedMember(x: AstNode) =
     CompilationError("Did not expect and unimplemented member in this position", x)
 
-  def UnexpectedExpressionInStatementPosition(x: AstNode) =
-    CompilationError("Did not expect an expression here, expected statement", x)
+ def UnexpectedExpressionInStatementPosition(x: AstNode) =
+    CompilationError("Did not expect an expression at this position, expected statement", x)
 }
