@@ -39,6 +39,20 @@ object Processor {
         val process = f
       }
 
+    def Result[A](value: A, errors: Seq[X]): Result[A, X] = new Result(value, errors)
+    def Result[A](value: A): Result[A, X] = Result(value, Seq.empty)
+    def Result[A](value: A, error: X): Result[A, X] = Result(value, Seq(error))
+    def Result[A](error: X)(implicit empty: Empty[A]): Result[A, X] = Result(empty.value, Seq(error))
+
+    def sequence[A, X](seq: Result[A, X] *): Result[Seq[A], X] =
+      seq.foldLeft(new Result[Seq[A], X](Seq.empty, Seq.empty)) {
+        (result, a) =>
+          for {
+            result <- result
+            a <- a
+          } yield result :+ a
+      }
+
     implicit def coproductProcessor[A, B](implicit left: Processor[A] { type ErrorType = X }, right: Processor[B] { type ErrorType = X }):
       (A | B) -> (left.ResultType | right.ResultType) = P {
         _.fold(left process _ map injectLeft, right process _ map injectRight)
@@ -54,12 +68,12 @@ object Processor {
 
     implicit def optionProcessor[A](implicit processor: Processor[A] { type ErrorType = X }):
       Option[A] -> Option[processor.ResultType] = P {
-        _.map(processor process _ map (Option(_))).getOrElse(Result(None, empty))
+        _.map(processor process _ map (Option(_))).getOrElse(Result(None))
       }
 
     implicit def seqProcessor[A](implicit processor: Processor[A] { type ErrorType = X }):
       Seq[A] -> Seq[processor.ResultType] = P {
-        _.map(processor.process).foldLeft(Result(Seq.empty[processor.ResultType], Seq.empty[X])) {
+        _.map(processor.process).foldLeft(Result(Seq.empty[processor.ResultType])) {
           (result, element) =>
             for {
               seq <- result

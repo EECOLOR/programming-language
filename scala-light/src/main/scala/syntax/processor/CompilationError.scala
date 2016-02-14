@@ -21,6 +21,12 @@ object CompilationError {
   def UnexpectedUnimplementedMember(x: AstNode) =
     CompilationError("Did not expect and unimplemented member in this position", x)
 
- def UnexpectedExpressionInStatementPosition(x: AstNode) =
+  def UnexpectedExpressionInStatementPosition(x: AstNode) =
     CompilationError("Did not expect an expression at this position, expected statement", x)
+
+  def TypeArgumentsNotSupportedError(x: AstNode) =
+    CompilationError("Type arguments on unimplemented members are not supported yet", x)
+
+  def ArgumentsNotSupportedError(x: AstNode) =
+    CompilationError("Arguments on unimplemented members are not supported yet", x)
 }

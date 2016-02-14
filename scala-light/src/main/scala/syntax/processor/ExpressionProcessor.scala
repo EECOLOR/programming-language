@@ -112,9 +112,15 @@ object ExpressionProcessor {
     }
   }
 
-  private def asSingleExpression(expressions: Seq[Statement | Expression])(ast: AstNode): Expression =
-    expressions match {
+  private def asSingleExpression(body: Seq[Seq[Statement] | Expression])(ast: AstNode): Expression =
+    body match {
       case Seq(Right(expression)) => expression
-      case x => Block(x)(ast)
+      case x =>
+        Block {
+          x.flatMap {
+            case Left(statements) => statements.map(injectLeft)
+            case Right(x) => Seq(Right(x))
+          }
+        }(ast)
     }
 }

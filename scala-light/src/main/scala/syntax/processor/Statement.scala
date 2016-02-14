@@ -10,8 +10,6 @@ object Statement {
   import Shared._
   import Expression.{ Reference, MemberAccess }
 
-  case class Package(path: Seq[Id], body: Seq[Statement])(val ast: AstNode) extends Statement
-
   case class MarkedStatement(mark: Id, statement: Statement)(val ast: AstNode) extends Statement
 
   case class Trait(name: Id, typeArguments: Seq[Argument], arguments: Seq[Argument], unimplementedMembers: Seq[UnimplementedMember], body: Seq[Statement])(val ast: AstNode) extends Statement
@@ -27,7 +25,5 @@ object Statement {
   case class Import(path: Reference | MemberAccess)(val ast: AstNode) extends Statement
   case class ImportAs(path: Reference | MemberAccess, as: Id)(val ast: AstNode) extends Statement
 
-  case class Statements(statements: Seq[Statement])(val ast: AstNode) extends Statement
-
-  case class UnimplementedMember(name: Id, typeArguments: Seq[Argument], arguments: Seq[Argument], `type`: Expression)(val ast: AstNode) extends ProcessedAstNode
+  case class UnimplementedMember(name: Id, `type`: Expression)(val ast: AstNode)
 }

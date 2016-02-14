@@ -12,5 +12,6 @@ object Shared {
   case class LiteralGroup(literal: String, value: String)(val ast: AstNode) extends ProcessedAstNode
 
   // question: Should arguments have type parameters?
+  // answer: yes, packages too I suppose
   case class Argument(name: Id, `type`: Option[Expression])(val ast: AstNode) extends ProcessedAstNode
 }

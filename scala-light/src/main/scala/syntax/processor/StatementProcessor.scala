@@ -24,7 +24,8 @@ import syntax.ast.Statement.{
 }
 import syntax.ast.Shared.{
    Argument => AstArgument,
-  Reference => AstReference
+  Reference => AstReference,
+      Value => AstValue
 }
 
 object StatementProcessor {
@@ -37,42 +38,47 @@ object StatementProcessor {
   import SharedProcessor._
   import Statement._
 
+  import scala.language.implicitConversions
+  implicit private def injectStatements(x: Statement): Seq[Statement] = Seq(x)
+
   implicit val processor:
-    AstStatement -> Statement = P {
-      case x @ AstPackage(path, body) =>
+    AstStatement -> Seq[Statement] = P {
+      case x @ AstPackage(Seq(), body) =>
         for {
           newBody <- withoutUnimplementedMember(body)
-          newPath <- process(path)
-        } yield Package(newPath, newBody)(x)
+        } yield newBody
+
+      case x @ AstPackage(Seq(first, rest @ _*), body) =>
+        for {
+          newBody  <- withoutUnimplementedMember(body)
+          newFirst <- process(first)
+          newRest  <- process(rest)
+        } yield newRest.foldRight(Object(newFirst, typeArguments = empty, newBody)(x)) {
+          case (id, body) => Object(id, typeArguments = empty, Seq(body))(x)
+        }
 
       case x @ AstObject(name, typeArguments, extensions, body) =>
-        val `object` =
-          for {
-            newBody          <- withoutUnimplementedMember(body)
-            newTypeArguments <- process(typeArguments)
-          } yield Object(name, newTypeArguments, newBody)(x)
-
-        `object`.withErrors(extensions.map(NoExtensionsError))
+        for {
+          newBody          <- withoutUnimplementedMember(body)
+          newTypeArguments <- process(typeArguments)
+                              .withErrors(extensions.map(NoExtensionsError))
+        } yield Object(name, newTypeArguments, newBody)(x)
 
       case x @ AstClass(name, typeArguments, arguments, extensions, body) =>
-        val `class` =
-          for {
-            newTypeArguments     <- process(typeArguments)
-            unimplementedMembers <- argumentsAsUnimplementedMembers(arguments)
-            newBody              <- withoutUnimplementedMember(body)
-          } yield Class(name, newTypeArguments, unimplementedMembers, newBody)(x)
-
-        `class`.withErrors(extensions.map(NoExtensionsError))
+        for {
+          newTypeArguments     <- process(typeArguments)
+          unimplementedMembers <- argumentsAsUnimplementedMembers(arguments)
+          newBody              <- withoutUnimplementedMember(body)
+                                  .withErrors(extensions.map(NoExtensionsError))
+        } yield Class(name, newTypeArguments, unimplementedMembers, newBody)(x)
 
       case x @ AstTrait(name, typeArguments, arguments, extensions, body) =>
-        val `trait` =
-          for {
-            newTypeArguments                <- process(typeArguments)
-            newArguments                    <- process(arguments)
-            (unimplementedMembers, newBody) <- separateUnimplementedMembersFrom(body)
-          } yield Trait(name, newTypeArguments, newArguments, unimplementedMembers, newBody)(x)
-
-        `trait`.withErrors(extensions.map(NoExtensionsError))
+        for {
+          newTypeArguments                <- process(typeArguments)
+          newArguments                    <- process(arguments)
+          (unimplementedMembers, newBody) <- separateUnimplementedMembersFrom(body)
+                                             .withErrors(extensions.map(NoExtensionsError))
+        } yield Trait(name, newTypeArguments, newArguments, unimplementedMembers, newBody)(x)
 
       case x @ AstDef(name, typeArguments, arguments, tpe, body) =>
         for {
@@ -103,8 +109,8 @@ object StatementProcessor {
 
       case x @ AstMarkedStatement(mark, statement) =>
         for {
-          newStatement <- process(statement)
-        } yield MarkedStatement(mark, newStatement)(x)
+          newStatements <- process(statement)
+        } yield newStatements.map(x => MarkedStatement(mark, x)(x.ast))
 
       case x @ AstImport(Right(single)) =>
         for {
@@ -114,13 +120,13 @@ object StatementProcessor {
       case x @ AstImport(Left(multiple)) =>
         for {
           imports <- process(multiple)
-        } yield Statements(imports.toSeq.map(_.merge))(x)
+        } yield imports.toSeq.map(_.merge)
 
       case x @ AstComment(_) =>
-        Result(Statements(empty)(x))
+        Result(empty)
 
       case x: AstUnimplementedMember =>
-        Result(Statements(empty)(x), UnexpectedUnimplementedMember(x))
+        Result(empty, UnexpectedUnimplementedMember(x))
     }
 
   private implicit val multipleImportsProcessor:
@@ -151,7 +157,7 @@ object StatementProcessor {
       case x @ AstArgument(_, Some(tpe), _) =>
         for {
           Argument(name, Some(tpe)) <- process(x)
-        } yield Some(UnimplementedMember(name, typeArguments = empty, arguments = empty, tpe)(x))
+        } yield Some(UnimplementedMember(name, tpe)(x))
       case x =>
         Result(ArgumentWithoutTypeAsUnimplmentedMemberError(x))
     }
@@ -171,7 +177,7 @@ object StatementProcessor {
         for {
           body      <- result
           processed <- process(x)
-        } yield body :+ processed
+        } yield body ++ processed
     }
 
   private def separateUnimplementedMembersFrom(body: Seq[AstStatement | AstExpression]) =
@@ -179,17 +185,17 @@ object StatementProcessor {
       case (result, Left(x @ AstUnimplementedMember(name, typeArguments, arguments, tpe))) =>
         for {
           (unimplementedMembers, body) <- result
-          processedTypeArguments       <- process(typeArguments)
-          processedArguments           <- process(arguments)
+            .withErrors(typeArguments map TypeArgumentsNotSupportedError)
+            .withErrors(    arguments map ArgumentsNotSupportedError    )
           newTpe                       <- process(tpe)
-          newUnimplementedMember = UnimplementedMember(name, processedTypeArguments, processedArguments, newTpe)(x)
+          newUnimplementedMember = UnimplementedMember(name, newTpe)(x)
         } yield (unimplementedMembers :+ newUnimplementedMember, body)
       case (result, Right(x)) =>
         result withError UnexpectedExpressionInStatementPosition(x)
       case (result, Left(x)) =>
         for {
           (unimplementedMembers, body) <- result
-          element                      <- process(x)
-        } yield (unimplementedMembers, body :+ element)
+          elements                     <- process(x)
+        } yield (unimplementedMembers, body ++ elements)
     }
 }
