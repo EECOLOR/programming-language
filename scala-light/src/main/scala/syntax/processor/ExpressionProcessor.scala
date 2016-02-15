@@ -1,5 +1,6 @@
 package syntax.processor
 
+import syntax.Empty.empty
 import syntax.Processor
 import syntax.UsefulDataTypes.|
 import syntax.ast.AstNode
@@ -23,6 +24,7 @@ import syntax.ast.Shared.{
 
 object ExpressionProcessor {
 
+  import CompilationError._
   import Shared.context._
   import Shared.Id
   import Processor._
@@ -90,18 +92,7 @@ object ExpressionProcessor {
         } yield Application(newTarget, newProduct)(x)
 
       case x @ AstNamedProductApplication(target, arguments) =>
-        for {
-          newTarget    <- process(target)
-          newArguments <- seqProcessor(processNamedArguments) process arguments
-        } yield NamedProductApplication(newTarget, newArguments)(x)
-    }
-
-  private implicit val processNamedArguments:
-    (Option[AstId], AstExpression) -> (Option[Id], Expression) = P {
-      case (id, expression) =>
-        for {
-          newExpression <- process(expression)
-        } yield (id map asId, newExpression)
+        Result(Block(empty)(x), NamedProductApplicationNotSupportedError(x))
     }
 
   private def findSeparatedExpressions(id: AstId, target: AstExpression): Seq[AstExpression] ={

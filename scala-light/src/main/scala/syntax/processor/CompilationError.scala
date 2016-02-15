@@ -32,4 +32,7 @@ object CompilationError {
 
   def MemberExtractionNotSupportedError(x: AstNode) =
     CompilationError("Member extraction not supported yet", x)
+
+  def NamedProductApplicationNotSupportedError(x: AstNode) =
+    CompilationError("Named product application not supported yet", x)
 }
