@@ -20,10 +20,7 @@ object Statement {
   case class Val(name: Id, typeArguments: Seq[Argument], `type`: Option[Expression], body: Expression)(val ast: AstNode) extends Statement
   case class TypeConstructor(name: Id, typeArguments: Seq[Argument], body: Expression)(val ast: AstNode) extends Statement
 
-  case class MemberExtraction(target: Option[Reference | MemberAccess], names: NonEmptySeq[Id], expression: Expression)(val ast: AstNode) extends Statement
-
-  case class Import(path: Reference | MemberAccess)(val ast: AstNode) extends Statement
-  case class ImportAs(path: Reference | MemberAccess, as: Id)(val ast: AstNode) extends Statement
+  case class Import(path: Reference | MemberAccess, as: Id)(val ast: AstNode) extends Statement
 
   case class UnimplementedMember(name: Id, `type`: Expression)(val ast: AstNode)
 }

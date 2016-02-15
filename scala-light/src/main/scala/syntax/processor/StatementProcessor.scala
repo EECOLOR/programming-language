@@ -102,10 +102,7 @@ object StatementProcessor {
         } yield TypeConstructor(name, processedTypeArguments, newBody)(x)
 
       case x @ AstMemberExtraction(target, names, expression) =>
-        for {
-          newTarget     <- process(target)
-          newExpression <- process(expression)
-        } yield MemberExtraction(newTarget, names map asId, newExpression)(x)
+        Result(MemberExtractionNotSupportedError(x))
 
       case x @ AstMarkedStatement(mark, statement) =>
         for {
@@ -115,12 +112,13 @@ object StatementProcessor {
       case x @ AstImport(Right(single)) =>
         for {
           reference <- process(single.path)
-        } yield Import(reference)(x)
+          name      =  reference.fold(_.to, _.member.to)
+        } yield Import(reference, name)(x)
 
       case x @ AstImport(Left(multiple)) =>
         for {
           imports <- process(multiple)
-        } yield imports.toSeq.map(_.merge)
+        } yield imports.toSeq
 
       case x @ AstComment(_) =>
         Result(empty)
@@ -130,7 +128,7 @@ object StatementProcessor {
     }
 
   private implicit val multipleImportsProcessor:
-    AstImport.Multiple -> NonEmptySeq[ImportAs | Import] = P {
+    AstImport.Multiple -> NonEmptySeq[Import] = P {
       case AstImport.Multiple(base, parts) =>
         val imports = parts.map((base, _))
 
@@ -140,16 +138,18 @@ object StatementProcessor {
     }
 
   private implicit val importsProcessor:
-    (AstReference, AstImport.As | AstImport.Id) -> (ImportAs | Import) = P {
+    (AstReference, AstImport.As | AstImport.Id) -> Import = P {
+
       case (base, Left(x @ AstImport.As(idRef, id))) =>
         for {
           newRef <- process(base :+ idRef)
           newId  <- process(id)
-        } yield ImportAs(newRef, newId)(x)
+        } yield Import(newRef, newId)(x)
+
       case (base, Right(x @ AstImport.Id(idRef))) =>
         for {
           newRef <- process(base :+ idRef)
-        } yield Import(newRef)(x)
+        } yield Import(newRef, idRef.to)(x)
     }
 
   private def argumentAsUnimplementedMember:

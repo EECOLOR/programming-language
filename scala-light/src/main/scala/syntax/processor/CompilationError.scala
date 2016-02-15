@@ -29,4 +29,7 @@ object CompilationError {
 
   def ArgumentsNotSupportedError(x: AstNode) =
     CompilationError("Arguments on unimplemented members are not supported yet", x)
+
+  def MemberExtractionNotSupportedError(x: AstNode) =
+    CompilationError("Member extraction not supported yet", x)
 }
