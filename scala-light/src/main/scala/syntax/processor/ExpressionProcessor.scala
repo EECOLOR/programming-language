@@ -21,6 +21,7 @@ import syntax.ast.Shared.{
            Id => AstId,
   IdReference => AstIdReference
 }
+import syntax.UsefulDataTypes.NonEmptySeq
 
 object ExpressionProcessor {
 
@@ -95,11 +96,11 @@ object ExpressionProcessor {
         Result(Block(empty)(x), NamedProductApplicationNotSupportedError(x))
     }
 
-  private def findSeparatedExpressions(id: AstId, target: AstExpression): Seq[AstExpression] ={
+  private def findSeparatedExpressions(id: AstId, target: AstExpression): NonEmptySeq[AstExpression] ={
     target match {
       case AstExpression.WhitespaceApplication(newTarget, AstIdReference(targetId, Seq()), argument) if targetId == id =>
         findSeparatedExpressions(id, newTarget) :+ argument
-      case _ => Seq(target)
+      case _ => NonEmptySeq(target, empty)
     }
   }
 

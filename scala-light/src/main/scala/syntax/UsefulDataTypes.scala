@@ -12,6 +12,9 @@ object UsefulDataTypes {
     def foldLeft[B](first: A => B)(rest: (B, A) => B): B =
       tail.foldLeft(first(head))(rest)
 
+    def foldRight[B](first: A => B)(rest: (A, B) => B): B =
+      tail.foldRight(first(head))(rest)
+
     def :+ (a: A): NonEmptySeq[A] =
       NonEmptySeq(head, tail :+ a)
   }
