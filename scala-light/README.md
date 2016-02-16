@@ -8,7 +8,7 @@ I am convinced that my (imaginary) perfect programming language is not rooted in
 
 One of the most important factors is consistency. I want my language to have clear semantics. While exploring the vast amount of documentation on related math theories I found that arrows (or functions) are often used to describe semantics. From a programmer point of view, Conal Elliott made a very strong case for this with [Denotational design with type class morphisms](http://conal.net/papers/type-class-morphisms/).
 
-This made observation made me think: what if I can translate language concepts to functions? If I can do that, I will have very clear semantics. So I started fiddling and came up with a few examples. I'll show a few, so you can get the idea:
+This observation made me think: what if I can translate language concepts to functions? If I can do that, I will have very clear semantics. So I started fiddling and came up with a few examples. I'll show a few, so you can get the idea:
 
 **Product**
 
