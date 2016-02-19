@@ -178,7 +178,4 @@ object StatementProcessor {
       TypedBody(body, `type` getOrElse ?)
     }
   }
-
-  private type Identifier = Application
-  private def Identifier(s: Id): Identifier = Application("Identifier", s)(Generated)
 }

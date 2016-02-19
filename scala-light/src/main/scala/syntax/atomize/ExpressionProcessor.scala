@@ -69,7 +69,9 @@ object ExpressionProcessor {
         for {
           newTarget        <- process(target)
           newTypeArguments <- process(typeArguments)
-        } yield newTypeArguments.foldLeft(Application(newTarget, to)(x))(Application(_, _)(x))
+          typedMember      =  Application(("body" withType Identifier(to)) `=>` "body", to)(to.merge)
+          memberAccess     = Application(newTarget, typedMember)(x)
+        } yield newTypeArguments.foldLeft(memberAccess)(Application(_, _)(x))
 
       case AstProduct(expressions) =>
         for {

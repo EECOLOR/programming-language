@@ -21,6 +21,8 @@ object Shared {
   val `__`: Id = "_"
   val ? : Reference = "?"
   val Unit: Reference = "Unit"
+  type Identifier = Application
+  def Identifier(s: Id): Identifier = Application("Identifier", s)(Generated)
 
   case class NameTypePair(name: Id, tpe: Type)
   type ExposedMember = NameTypePair
