@@ -1,3 +1,6 @@
+In case you are reading this, it's on hold. During my adventure I found some holes in my knowledge of the domain and problems with my approach. The project is not gone, but in it's current form it's not the way to go.
+------
+
 This document is an attempt to sketch my vision. Students (or people in the JavaScript and PHP community) are not afraid to try and encode their ideas. I want to try and follow in their footsteps.
 
 In theory I like the Scala programming language, in practice I don't. There are way too many bugs and inconsistencies for me comfortably express myself.
