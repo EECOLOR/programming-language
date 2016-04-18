@@ -70,13 +70,20 @@ object ExpressionProcessor {
           newTarget        <- process(target)
           newTypeArguments <- process(typeArguments)
           typedMember      =  Application(("body" withType Identifier(to)) `=>` "body", to)(to.merge)
-          memberAccess     = Application(newTarget, typedMember)(x)
+          memberAccess     =  Application(newTarget, typedMember)(x)
         } yield newTypeArguments.foldLeft(memberAccess)(Application(_, _)(x))
 
       case AstProduct(expressions) =>
         for {
           newExpressions <- process(expressions)
-        } yield ("f" withType Product(expressions.size)) `=>` Product.call("f", newExpressions)
+          count          =  newExpressions.size
+        } yield {
+          def call(target: Expression, expressions: Seq[Expression]) =
+            expressions.foldLeft(target)(Application(_, _)(Generated))
+          val X = "X"
+          val productType = Seq.fill(count)(?).toFunctionType(returnType = X) `=>` X
+          (X withType Type) `=>` (("f" withType productType) `=>` call("f", newExpressions))
+        }
 
       case x @ AstSeparatedExpressions(Id("=>"), expressions) =>
         for {

@@ -79,17 +79,6 @@ object Shared {
       (resultType +: options).foldLeft(target)(Application(_, _)(Generated))
   }
 
-  object Product {
-    def apply(count: Int) = {
-      val X = "X"
-      val productType = Seq.fill(count)(?).toFunctionType(returnType = X) `=>` X
-      (X withType Type) `=>` productType
-    }
-
-    def call(target: Expression, values: Seq[Expression]) =
-      values.foldLeft(target)(Application(_, _)(Generated))
-  }
-
   object Id {
     def unapply(id: AstId): Option[String] =
       id.left.toOption.map(_.value)

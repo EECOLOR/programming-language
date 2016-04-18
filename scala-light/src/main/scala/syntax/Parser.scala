@@ -154,7 +154,7 @@ object Parser {
         .map(construct[Expression => ProductApplication])
 
     val namedProductApplication =
-      PP( ` `.? ~ commaSeparated("(" , (namedArgument.? ~ expression).* , ")") )
+      PP( ` `.? ~ commaSeparated("(" , (namedArgument.? ~ expression).+ , ")") )
         .map(construct[Expression => NamedProductApplication])
 
     val blockFunctionApplication =
