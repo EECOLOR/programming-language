@@ -264,30 +264,26 @@ Keyword definition
       }
     }
     replace with {
-      val 'Type0_Id1 : Type = Identifier
-      val 'Type0_Id2 : Type = Identifier
-      // It's ok to have two val declarations (arguments) with the same name, one represents a type, the other its constructor
-      val 'Type0 : Type = ( (Type0_Id1, Type0_Id1 => 'Type1), (Type0_Id2, Type0_Id2 => 'Type2) )
-      val 'Type0 : 'Type1 => 'Type2 => 'Type0 = 'id1 => 'id2 => ( ('id1, x => 'id1), ('id2, x => 'id2) )
+
+      val 'Type0: (Identifier['id1] | Identifier['id2]) => Type = f => f(_ => Type1)(_ => Type2)
+
+      val 'Type0 : 'Type1 => 'Type2 => 'Type0 =  'id1 => 'id2 =>
+        (id: Identifier['id1] | Identifier['id2]) => id(_ => 'id1, _ => 'id2)
     }
 
     syntax {
       trait 'Type0 {
-        val 'id1 : 'Type1 = 'body1
-        def 'id2 : 'Type2 = 'body2
-        'id3 : 'Type3
+        // private is the default, public is `+`
+        + val 'id1 : 'Type1 = 'body1
+        'id2 : 'Type2
       }
     }
     replace with {
-      val 'Type0_Id1 : Type = Identifier
-      val 'Type0_Id2 : Type = Identifier
-      val 'Type0_Id3 : Type = Identifier
-      val 'Type0 : Type = ( ( Type0_Id1, Type0_Id1 => 'Type1 ), (Type0_Id2, Type0_Id2 => () => 'Type2), (Type0_Id3, Type0_Id3 => 'Type3) )
-      val 'Type0 : 'Type3 => 'Type0 = { 'id3 =>
+      val 'Type0 : (Identifier['id1] | Identifier['id2]) => Type = f => f(_ => Type1, _ => Type2)
+      val 'Type0 : 'Type3 => 'Type0 = { 'id2 =>
         val 'id1 : 'Type1 = 'body1
-        def 'id2 : 'Type2 = 'body2
 
-        ( ( 'id1, x => 'id1), ( 'id2, x => 'id2 ), ('id3, x => 'id3 ) )
+        (id: Identifier['id1] | Identifier['id2]) => id(_ => 'id1, _ => 'id2)
       }
     }
 
@@ -295,35 +291,17 @@ Keyword definition
       // if you want to expose a constructor argument, put it in the body
       trait 'Type0( 'id1 : 'Type1 ) {
         'id2: 'Type2
-        val 'id3 : 'Type3 = 'body3
+        + val 'id3 : 'Type3 = 'body3
+        val 'id4 : 'Type4 = 'body4
       }
     }
     replace with {
-      val 'Type0_Id2 : Type = Identifier
-      val 'Type0_Id3 : Type = Identifier
-      val 'Type0 : Type = ( (Type0_Id2, Type0_Id2 => 'Type2), (Type0_Id3, Type0_Id3 => 'Type3) )
+      val 'Type0 : (Identifier['id2] | Identifier['id3]) => Type = f => f(_ => Type2, _ => Type3)
       val 'Type0 : 'Type1 => 'Type2 => 'Type0 = { 'id1 => 'id2 =>
         val 'id3 : 'Type3 = 'body3
+        val 'id4 : 'Type4 = 'body4
 
-        ( ('id2, x => 'id2), ('id3, x => 'id3) ) )
-      }
-    }
-
-    syntax {
-      trait 'Type0('id1 : 'Type1) {
-        val 'id2 : 'Type2 = 'body2
-        // replaced 'private' with '-'
-        - val 'id3 : 'Type3 = 'body3
-      }
-    }
-    repace with {
-      val 'Type0_Id2 : Type = Identifier
-      val 'Type0 : Type = ( (Type0_Id2, Type0_Id2 => 'Type2) )
-      val 'Type0 : 'Type1 => 'Type0 = { 'id1 =>
-        val 'id2 : 'Type2 = 'body2
-        val 'id3 : 'Type3 = 'body3
-
-        ( ('id2, x => 'id2) )
+        (id: Identifier['id2] | Identifier['id3]) => id(_ => 'id2, _ => 'id3)
       }
     }
   }
