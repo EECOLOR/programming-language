@@ -28,6 +28,7 @@ The IR represents the internal model of the language. At this stage it makes sen
 - λN [Lambda Calculus with Names](http://scg.unibe.ch/archive/oosc/PDF/Dami95aLambdaN.pdf)
 - λμ [Lambda Mu Calculus](https://en.wikipedia.org/wiki/Lambda-mu_calculus)
 - μ [Mu Calculus](https://en.wikipedia.org/wiki/Modal_%CE%BC-calculus)
+- [Event Calculus](https://en.wikipedia.org/wiki/Event_calculus)
 
 This list is not complete. Some of the models are extensions of other models while others are not compatible. There is a ton of information out there, but it seems there is no structured overview of features.
 
