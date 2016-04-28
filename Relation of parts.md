@@ -29,6 +29,7 @@ The IR represents the internal model of the language. At this stage it makes sen
 - λμ [Lambda Mu Calculus](https://en.wikipedia.org/wiki/Lambda-mu_calculus)
 - μ [Mu Calculus](https://en.wikipedia.org/wiki/Modal_%CE%BC-calculus)
 - [Event Calculus](https://en.wikipedia.org/wiki/Event_calculus)
+- [Arrow Calculus](http://homepages.inf.ed.ac.uk/wadler/papers/arrows-jfp/arrows-jfp.pdf)
 
 This list is not complete. Some of the models are extensions of other models while others are not compatible. There is a ton of information out there, but it seems there is no structured overview of features.
 
