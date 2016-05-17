@@ -10,6 +10,7 @@ object Expression {
   case class Application(target: Expression, argument: Expression)(val position: Position) extends Expression
   case class Block(body: Seq[Statement | Expression])(val position: Position) extends Expression
   case class BlockFunction(arguments: Seq[Argument], body: Seq[Statement | Expression])(val position: Position) extends Expression
+  case class ByName(expression: Expression)(val position: Position) extends Expression
   case class Function(arguments: Seq[Argument], body: Expression)(val position: Position) extends Expression
   case class MarkedLiteralGroup(mark: Value, literalGroup: LiteralGroup)(val position: Position) extends Expression
   case class MemberAccess(target: Expression, member: IdReference)(val position: Position) extends Expression

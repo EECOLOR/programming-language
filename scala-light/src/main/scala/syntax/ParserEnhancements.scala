@@ -4,6 +4,14 @@ import fastparse.all._
 import fastparse.Implicits.Sequencer
 import fastparse.core.ParseCtx
 
+object ParserEnhancements {
+  def apply(
+    whitespace        : => P[Unit],
+    spaces            : => P[Unit],
+    spacesSingleBreak : => P[Unit]
+  ) = new ParserEnhancements(whitespace, spaces, spacesSingleBreak)
+
+}
 class ParserEnhancements(
   whitespace        : => P[Unit],
   spaces            : => P[Unit],

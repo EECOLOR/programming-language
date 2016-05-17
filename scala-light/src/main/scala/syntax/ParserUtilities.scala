@@ -21,6 +21,9 @@ object ParserUtilities {
   def not(chars: String) =
     P( CharsWhile(NamedFunction(!chars.contains(_), s"not($chars)")).! )
 
+  def stringIn(seq: Seq[String]) =
+    StringIn(seq: _*)
+
   private case class NamedFunction[T, V](f: T => V, name: String) extends (T => V){
     def apply(t: T) = f(t)
     override def toString() = name

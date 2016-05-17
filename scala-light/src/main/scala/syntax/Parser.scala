@@ -17,7 +17,7 @@ object Parser {
   import ast.Constructors._
 
   val parserEnhancements =
-    new ParserEnhancements(
+    ParserEnhancements(
       whitespace        = ` \n`,
       spaces            = ` `,
       spacesSingleBreak = `  `
@@ -80,7 +80,7 @@ object Parser {
     }
 
     val traitStatement =
-      PP( "trait" ~ ` ` commit id ~ typeArguments.? ~ valueArguments.? ~ extension.* ~(`  ` ~ block).? ).map(construct[Trait])
+      PP( "trait" ~ ` ` commit id ~ typeArguments.? ~ valueArguments.? ~ extension.* ~ (`  ` ~ block).? ).map(construct[Trait])
 
     val objectStatement =
       PP( "object" ~ ` ` commit id ~ typeArguments.? ~ extension.* ~ (`  ` ~ block).? ).map(construct[Object])
@@ -122,11 +122,14 @@ object Parser {
     import ast.Expression._
 
     val expression: P[Expression] =
-      P( function | noWhitespaceExpression maybeFollowedBy whitespaceApplication)
+      P( byName | function | noWhitespaceExpression maybeFollowedBy whitespaceApplication)
 
     lazy val noWhitespaceExpression: P[Expression] =
       P( blockFunction | blockExpression | product | markedLiteralGroup | referenceExpression )
         .maybeFollowedBy(memberAccess, productApplication.noCommit, namedProductApplication, blockFunctionApplication, blockApplication)
+
+    val byName =
+      PP( "=>" ~ ` ` commit expression).map(construct[ByName])
 
     val function =
       PP( functionArguments ` ` "=>" ~ `  ` commit expression ).map(construct[Function])
@@ -203,7 +206,7 @@ object Parser {
 
     val literal = {
       val legalInId = P( not(illegalInId) )
-      val keyword = P( StringIn(keywords: _*) ~ !legalInId )
+      val keyword = P( stringIn(keywords) ~ !legalInId )
 
       P( indexed( !keyword ~ legalInId ) )
     }
@@ -251,3 +254,4 @@ object Parser {
       P(Index ~ parser ~ Index).map { case (start, value, end) => (value, ast.Position(start, end)) }
   }
 }
+

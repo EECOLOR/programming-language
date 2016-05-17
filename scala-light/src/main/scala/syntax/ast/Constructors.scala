@@ -188,6 +188,7 @@ object Constructors {
     }
   }
 
+  implicit object ByNameConstructor              extends Positioned1(ByName.apply)
   implicit object ValueConstructor               extends Positioned1(Value.apply)
   implicit object LiteralGroupConstructor        extends Positioned2(LiteralGroup.apply)
   implicit object MemberExtractionConstructor    extends Positioned3(MemberExtraction.apply)
