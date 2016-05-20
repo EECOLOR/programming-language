@@ -36,7 +36,7 @@ object SharedProcessor {
 
   implicit val processReference:
     AstReference -> (Reference | MemberAccess) = P {
-      _
+      _.to
         .map(processIdReference.process)
         .foldLeft(_ map[Reference | MemberAccess] injectLeft) {
           case (result, reference) =>

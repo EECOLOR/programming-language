@@ -188,6 +188,11 @@ object Constructors {
     }
   }
 
+  implicit object ReferenceConstructor extends Constructor[Shared.Reference] {
+    type From = (IdReference, Seq[IdReference])
+    val construct: From => To = { case (first, rest) => Shared.Reference(NonEmptySeq(first, rest)) }
+  }
+
   implicit object ByNameConstructor              extends Positioned1(ByName.apply)
   implicit object ValueConstructor               extends Positioned1(Value.apply)
   implicit object LiteralGroupConstructor        extends Positioned2(LiteralGroup.apply)

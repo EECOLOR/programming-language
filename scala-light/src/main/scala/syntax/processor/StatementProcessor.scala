@@ -142,13 +142,13 @@ object StatementProcessor {
 
       case (base, Left(x @ AstImport.As(idRef, id))) =>
         for {
-          newRef <- process(base :+ idRef)
+          newRef <- process(AstReference(base.to :+ idRef))
           newId  <- process(id)
         } yield Import(newRef, newId)(x)
 
       case (base, Right(x @ AstImport.Id(idRef))) =>
         for {
-          newRef <- process(base :+ idRef)
+          newRef <- process(AstReference(base.to :+ idRef))
         } yield Import(newRef, idRef.to)(x)
     }
 

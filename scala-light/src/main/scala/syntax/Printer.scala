@@ -71,13 +71,14 @@ trait DefaultPrinters {
     case x: Import.Multiple => print(x.path) + ".{ " + print(x.parts) + " }"
     case x: Import.As => print(x.original) + " => " + print(x.newId)
     case x: Import.Id => print(x.id)
+    case x: ByName => "( => " + print(x.expression) + ")"
   }
 
   implicit def _01: Printer[Seq[Id]] = p(_.toSeq map print[Id] mkString ".")
   implicit def _04: Printer[Seq[Statement | Expression]] = p(x => "  " + (x map print[Statement | Expression] mkString "\n") replace ("\n", "\n  "))
   implicit def _07: Printer[Seq[Argument]] = p(_ map print[Argument] mkString ", ")
   implicit def _09: Printer[Seq[Extension]] = p(x => " " + (x map print[Extension] mkString " "))
-  implicit def _11: Printer[Shared.Reference] = p(_.toSeq map print[IdReference] mkString ".")
+  implicit def _11: Printer[Shared.Reference] = p(_.to.toSeq map print[IdReference] mkString ".")
   implicit def _13: Printer[NonEmptySeq[Import.As | Import.Id]] = p(_.toSeq map print[Import.As | Import.Id] mkString ", ")
   implicit def _15: Printer[(Option[Id], Expression)] = p {
     case (id, expression) => print(id.map(" = " + print(_))) + print(expression)
