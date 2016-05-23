@@ -13,6 +13,7 @@ import java.util.UUID
 import syntax.ast.Position
 import syntax.ast.AstNode
 import syntax.UsefulDataTypes
+import syntax.UsefulDataTypes._
 import syntax.ast.Expression
 import syntax.ast.Shared
 
@@ -34,7 +35,6 @@ object Test {
   import Statement._
   import Expression._
   import Shared._
-  import UsefulDataTypes._
 
   case class Result(value: Future[Seq[CypherResultRow]])
 
@@ -79,154 +79,171 @@ object Test {
 
   }
 
-  class Concat[-T](replace: (Group, T) => Group) {
-    def apply(g: Group, i: T) = replace(g, i)
-  }
-  object Concat {
-    implicit object Node     extends Concat[Iterable[Node]]    ((n, i) => n.copy(others    = n.others    ++ i))
-    implicit object Group    extends Concat[Iterable[Group]]   ((n, i) => n.copy(children  = n.children  ++ i))
-    implicit object Relation extends Concat[Iterable[Relation]]((n, i) => n.copy(relations = n.relations ++ i))
-  }
-
   case class Node(
-    id: String,
     label: String,
-    properties: Map[String, Any] = Map.empty
-  ) {
-    def asGroup = Group(this)
-  }
-  case class Relation(from: Node, to: Node, label: String, properties: Map[String, Any] = Map.empty)
-  case class Group(
-    node: Node,
-    others: Set[Node] = Set.empty,
-    children: Set[Group] = Set.empty,
+    properties: Map[String, Any] = Map.empty,
     relations: Set[Relation] = Set.empty
-  ) {
-    def + (n: Node)     = copy(others    = others + n)
-    def + (g: Group)    = copy(children  = children + g)
-    def + (r: Relation) = copy(relations = relations + r)
+  ) { self =>
 
-    def ++ [T](n: T)(implicit x: Concat[T]) = x(this, n)
+    val id = newId
 
-    def -< (children: Seq[Group]) = {
-      val childRelations = children match {
+    case class - (r: Node => Relation) {
+      def -> [A](o: A)(implicit ev: A => Node)  = self.copy(relations = self.relations + r(o))
+    }
+
+    def -< (children: Seq[Node]) = {
+      children match {
         case Seq(first, rest @ _*) =>
-          Set(this - "First" -> first) ++ chain(children, "Next")
-        case _ => Set.empty
+          this - "First" -> children.reduceRight(_ - "Next" -> _)
+        case _ => this
       }
-
-      this ++ children ++ childRelations
     }
   }
 
-  def asNode(v: Value): Node = Node(newId, "Value", v.pos + ("value" -> v.value))
+  case class Relation(to: Node, label: String, properties: Map[String, Any] = Map.empty)
 
-  def propRel(from: Node, to: Node, prop: String) =
-    Relation(from, to, "Property", Map("name" -> prop))
-
-  implicit class NodeOps(n: Node) {
-    case class - (r: (Node, Node) => Relation) {
-      def -> (o: Node)  = r(n, o)
-      def -> (g: Group) = r(n, g.node)
-    }
-  }
-  implicit class GroupOps(g: Group) {
-    case class - (r: (Node, Node) => Relation) {
-      def -> (o: Node)  = r(g.node, o)
-      def -> (o: Group) = r(g.node, o.node)
-    }
-  }
-  implicit class RelationOps(g: Relation) {
-    case class - (r: (Node, Node) => Relation) {
-      def -> (o: Node)  = Set(g, r(g.to, o))
-      def -> (o: Group) = Set(g, r(g.to, o.node))
-    }
-  }
 
   import language.implicitConversions
-  implicit def stringToRelationBuilder(s: String): (Node, Node) => Relation =
-    (from, to) => Relation(from, to, s)
+  implicit def stringToRelationBuilder(s: String): Node => Relation =
+    to => Relation(to, s)
 
-  implicit def _1(x: Seq[Statement | Expression] ): Seq[Group] = x map (this process _.merge)
-  implicit def _2(x: Seq[AstNode]                ): Seq[Group] = x map process
-  implicit def _3(x: Option[AstNode]             ): Seq[Group] = x.toSeq
 
-  def prop(name: String) = (from: Node, to: Node) => Relation(from, to, "Property", Map("name" -> name))
+  implicit def _0(x: AstNode):Node = process(x)
+  implicit def _1(x: AstNode | AstNode ): AstNode = x.merge
+  implicit def _2[A](x: Seq[A])(implicit ev: A => AstNode): Seq[Node] = x map ev
+  implicit def _3[A](x: Option[A])(implicit ev: A => AstNode): Seq[Node] = x.toSeq
+  implicit def _4[A](x: NonEmptySeq[A])(implicit ev: A => AstNode): NonEmptySeq[Node] = x
+  implicit def _6[A](x: A)(implicit ev: A => AstNode): Node = toNode(x)
+  implicit def _7(x: Shared.Reference): Node = toNode(x)
 
-  def asNode(id: Id): Group = process(id.merge)
-  def asNode(ref: Option[Shared.Reference]): Option[Group] =
-    ???
+  def prop(name: String) = (to: Node) => Relation(to, "Property", Map("name" -> name))
 
-  def process: AstNode => Group = {
+  def toNode[A](a: A)(implicit ev: A => AstNode): Node = ev(a)
 
-    case x: Value =>
-      asNode(x).asGroup
+  def toNode(ref: Option[Shared.Reference]): Option[Node] = ref map toNode
+  def toNode(ref: Shared.Reference): Node =
+    ref.to.map(process).toSeq.reduceRight(_ - "Next" -> _)
 
-    case x @ LiteralGroup(literal, v) =>
-      val node = Node(newId, "LiteralGroup", x.pos + ("literal" -> literal)).asGroup
-      val value = asNode(v)
-
-      node + value + (node - prop("value") -> value)
-
-    case x @ Package(path, body) =>
-      val node = Node(newId, "Package", x.pos).asGroup -< body
-
-      val pathNodes = path.map(asNode)
-      val pathRelation = pathNodes match {
-        case Seq(first, rest @ _*) => Set(node - prop("path") -> first)
-        case _                     => Set.empty
-      }
-
-      node ++ pathNodes ++ pathRelation ++ chain(pathNodes, label = "Next")
-
-    case x @ Class(name, typeArguments, arguments, extensions, body) =>
-      val node = Node(newId, "Class", x.pos).asGroup -< typeArguments -< arguments -< extensions -< body
-      val nameNode = asNode(name)
-
-      node + nameNode + (node - prop("name") -> nameNode)
-
-    case x @ Object(name, typeArguments, extensions, body) =>
-      val node = Node(newId, "Object", x.pos).asGroup -< typeArguments -< extensions -< body
-      val nameNode = asNode(name)
-
-      node + nameNode + (node - prop("name") -> nameNode)
-
-    case x @ Trait(name, typeArguments, arguments, extensions, body) => ???
-      val node = Node(newId, "Trait", x.pos).asGroup -< typeArguments -< arguments -< extensions -< body
-      val nameNode = asNode(name)
-
-      node + nameNode + (node - prop("name") -> nameNode)
-
-    case x @ Def(name, typeArguments, arguments, tpe, body) =>
-      val node = Node(newId, "Def", x.pos).asGroup -< typeArguments -< arguments -< tpe
-      val (nameNode, bodyNode) = (asNode(name), process(body))
-
-      node + nameNode + bodyNode + (node - prop("name") -> nameNode) + (node - "Child" -> bodyNode)
-
-    case x @ Val(name, typeArguments, tpe, body) =>
-      val node = Node(newId, "Val", x.pos).asGroup -< typeArguments -< tpe
-      val (nameNode, bodyNode) = (asNode(name), process(body))
-
-      node + nameNode + bodyNode + (node - prop("name") -> nameNode) + (node - "Child" -> bodyNode)
-
-    case x @ TypeConstructor(name, typeArguments, body) =>
-      val node = Node(newId, "TypeConstructor", x.pos).asGroup -< typeArguments
-      val (nameNode, bodyNode) = (asNode(name), process(body))
-
-      node + nameNode + bodyNode + (node - prop("name") -> nameNode) + (node - "Child" -> bodyNode)
-
-    case x @ MemberExtraction(target, names, source) =>
-      val node = Node(newId, "MemberExtraction", x.pos)
-      val (targetNode, sourceNode) = (asNode(target), process(source))
-
-      ???
+  implicit class Chainable[A](a: A)(implicit ev: A => NonEmptySeq[Node]) {
+    def asChain(f: (Node, Node) => Node) = a.toSeq reduceRight f
   }
 
-  def chain(nodes: Seq[Group], label: String) =
-    nodes.sliding(2).foldLeft(Set.empty[Relation]) {
-      case (result, Seq(prev, next)) => result + (prev - label -> next)
-      case (result, _) => result
-    }
+  def process: AstNode => Node = {
+
+    case x @ Value(value) =>
+      Node("Value", x.pos + ("value" -> value))
+
+    case x @ LiteralGroup(literal, value) => (
+      Node("LiteralGroup", x.pos + ("literal" -> literal))
+        - prop("value") -> value
+    )
+
+    case x @ Package(path, body) =>
+      val node = Node("Package", x.pos) -< _2(body)
+
+      path map toNode[Id] match {
+        case NonEmptySeq.FromSeq(x) => node - prop("path") -> x.asChain(_ - "Next" -> _)
+        case _                      => node
+      }
+
+    case x @ Class(name, typeArguments, arguments, extensions, body) => (
+      Node("Class", x.pos)
+        -< typeArguments
+        -< arguments
+        -< extensions
+        -< body
+        - prop("name") -> name
+    )
+
+    case x @ Object(name, typeArguments, extensions, body) => (
+      Node("Object", x.pos)
+        -< typeArguments
+        -< extensions
+        -< body
+        - prop("name") -> name
+    )
+
+    case x @ Trait(name, typeArguments, arguments, extensions, body) => (
+      Node("Trait", x.pos)
+        -< typeArguments
+        -< arguments
+        -< extensions
+        -< body
+        - prop("name") -> name
+    )
+
+    case x @ Def(name, typeArguments, arguments, tpe, body) => (
+      Node("Def", x.pos)
+        -< typeArguments
+        -< arguments
+        -< tpe
+        - prop("name") -> name
+        - "Child"      -> body
+    )
+
+    case x @ Val(name, typeArguments, tpe, body) => (
+      Node("Val", x.pos)
+        -< typeArguments
+        -< tpe
+        - prop("name") -> name
+        - "Child"      -> body
+    )
+
+    case x @ TypeConstructor(name, typeArguments, body) => (
+      Node("TypeConstructor", x.pos)
+        -< typeArguments
+        - prop("name") -> name
+        - "Child"      -> body
+    )
+
+    case x @ MemberExtraction(target, names, source) =>
+      val node = (
+        Node("MemberExtraction", x.pos)
+          - prop("source") -> source
+          - prop("names")  -> names.asChain(_ - "Next" -> _)
+      )
+      toNode(target)
+        .map(node - prop("target") -> _)
+        .getOrElse(node)
+
+    case x @ Marked(mark, statement) => (
+      Node("Marked", x.pos)
+        - prop("mark")      -> mark
+        - prop("statement") -> statement
+    )
+
+    case x @ Comment(value) => (
+      Node("Comment", x.pos)
+        - prop("value") -> value
+    )
+
+    case x @ Import(value) => (
+      Node("Import", x.pos)
+        - prop("import") -> value
+    )
+
+    case x @ Import.Single(path) => (
+      Node("Import.Single", x.pos)
+        - prop("path") -> path
+    )
+
+    case x @ Import.Multiple(path, parts) => (
+      Node("Import.Multiple", x.pos)
+        - prop("path")  -> path
+        - prop("parts") -> parts.asChain(_ - "Next" -> _)
+    )
+
+    case x @ Import.Id(id) => (
+      Node("Import.Id", x.pos)
+        - prop("id") -> id
+    )
+
+    case x @ Import.As(original, newId) => (
+      Node("Import.As", x.pos)
+        - prop("original") -> original
+        - prop("newId")    -> newId
+    )
+  }
 
   implicit class PosOps(p: AstNode) {
     def pos: Map[String, Any] = {

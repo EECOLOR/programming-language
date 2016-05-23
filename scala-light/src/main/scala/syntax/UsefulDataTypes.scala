@@ -18,4 +18,11 @@ object UsefulDataTypes {
     def :+ (a: A): NonEmptySeq[A] =
       NonEmptySeq(head, tail :+ a)
   }
+
+  object NonEmptySeq {
+    object FromSeq {
+      def unapply[A](x: Seq[A]): Option[NonEmptySeq[A]] =
+        x.headOption.map(NonEmptySeq(_, x.tail))
+    }
+  }
 }
