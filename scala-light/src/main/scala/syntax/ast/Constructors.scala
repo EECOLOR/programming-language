@@ -126,9 +126,17 @@ object Constructors {
   }
 
   implicit object NamedProductApplicationConstructor extends Positioned[Expression => NamedProductApplication] {
-    type From = ((Option[Id], Expression), Seq[(Option[Id], Expression)])
+    type From = (NamedExpression | Expression, Seq[NamedExpression | Expression])
     val construct: From => To = { case (head, tail) =>
       position => target => NamedProductApplication(target, NonEmptySeq(head, tail))(position)
+    }
+  }
+
+  implicit object NamedExpressionContructor extends Positioned[NamedExpression | Expression] {
+    type From = (Option[Id], Expression)
+    val construct: From => To = {
+      case (Some(name), expression) => position => Left(NamedExpression(name, expression)(position))
+      case (_, expression)          => position => Right(expression)
     }
   }
 

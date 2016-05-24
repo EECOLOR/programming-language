@@ -60,7 +60,8 @@ object Expression {
   case class Function(arguments: Seq[Argument], body: Expression)(val position: Position) extends Expression
   case class MarkedLiteralGroup(mark: Value, literalGroup: LiteralGroup)(val position: Position) extends Expression
   case class MemberAccess(target: Expression, member: IdReference)(val position: Position) extends Expression
-  case class NamedProductApplication(target: Expression, arguments: NonEmptySeq[(Option[Id], Expression)])(val position: Position) extends Expression
+  case class NamedExpression(name: Id, expression: Expression)(val position: Position) extends Expression
+  case class NamedProductApplication(target: Expression, arguments: NonEmptySeq[NamedExpression | Expression])(val position: Position) extends Expression
   case class Product(expressions: Seq[Expression])(val position: Position) extends Expression
   case class ProductApplication(target: Expression, product: Product)(val position: Position) extends Expression
   case class Reference(to: Shared.Reference)(val position: Position) extends Expression

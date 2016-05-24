@@ -15,6 +15,7 @@ object Parser {
   import Separators._
   import ParserUtilities._
   import ast.Constructors._
+  import UsefulDataTypes.|
 
   val parserEnhancements =
     ParserEnhancements(
@@ -157,7 +158,7 @@ object Parser {
         .map(construct[Expression => ProductApplication])
 
     val namedProductApplication =
-      PP( ` `.? ~ commaSeparated("(" , (namedArgument.? ~ expression).+ , ")") )
+      PP( ` `.? ~ commaSeparated("(" , namedArgument.+ , ")") )
         .map(construct[Expression => NamedProductApplication])
 
     val blockFunctionApplication =
@@ -176,7 +177,7 @@ object Parser {
     }
 
     val namedArgument =
-      P( id.noCommit ` ` "=" ~ ` \n`.commit )
+      PP( (id.noCommit ` ` "=" ~ ` \n`.commit).? ~ expression ).map(construct[NamedExpression | Expression])
   }
 
   object shared {

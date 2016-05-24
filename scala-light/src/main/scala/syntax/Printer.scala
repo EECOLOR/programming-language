@@ -58,7 +58,8 @@ trait DefaultPrinters {
     case x: Function => "((" + print(x.arguments) + ") => " + print(x.body) + ")"
     case x: MarkedLiteralGroup => "<" + print(x.mark) + ">" + print(x.literalGroup)
     case x: MemberAccess => "(" + print(x.target) + "." + print(x.member) + ")"
-    case x: NamedProductApplication => "(" + print(x.target) + ".apply(" + (x.arguments.toSeq map print[(Option[Id], Expression)] mkString ", ") + "))"
+    case x: NamedExpression => print(" = " + print(x.name)) + print(x.expression)
+    case x: NamedProductApplication => "(" + print(x.target) + ".apply(" + (x.arguments.toSeq map print[NamedExpression | Expression] mkString ", ") + "))"
     case x: ProductApplication => "(" + print(x.target) + ".apply" + print(x.product) + ")"
     case x: Expression.Reference => print(x.to)
     case x: WhitespaceApplication => "(" + print(x.target) + " " + print(x.method) + " " + print(x.argument) + ")"
@@ -80,7 +81,4 @@ trait DefaultPrinters {
   implicit def _09: Printer[Seq[Extension]] = p(x => " " + (x map print[Extension] mkString " "))
   implicit def _11: Printer[Shared.Reference] = p(_.to.toSeq map print[IdReference] mkString ".")
   implicit def _13: Printer[NonEmptySeq[Import.As | Import.Id]] = p(_.toSeq map print[Import.As | Import.Id] mkString ", ")
-  implicit def _15: Printer[(Option[Id], Expression)] = p {
-    case (id, expression) => print(id.map(" = " + print(_))) + print(expression)
-  }
 }

@@ -89,15 +89,22 @@ object Test {
 
     case class - (r: Node => Relation) {
       def -> [A](o: A)(implicit ev: A => Node)  = self.copy(relations = self.relations + r(o))
+      def -> [A](o: Option[A])(implicit ev: A => Node) =
+        o match {
+          case Some(o) => self.copy(relations = self.relations + r(o))
+          case None    => self
+        }
+
+      def -< (o: NonEmptySeq[Node]): Node = self.copy(relations = self.relations + r(o.asChain(_ - "Next" -> _)))
+
+      def -< (o: Seq[Node]): Node =
+        o match {
+          case NonEmptySeq.FromSeq(x) => this -< x
+          case _ => self
+        }
     }
 
-    def -< (children: Seq[Node]) = {
-      children match {
-        case Seq(first, rest @ _*) =>
-          this - "First" -> children.reduceRight(_ - "Next" -> _)
-        case _ => this
-      }
-    }
+    def + (prop: (String, Any)) = copy(properties = properties + prop)
   }
 
   case class Relation(to: Node, label: String, properties: Map[String, Any] = Map.empty)
@@ -131,123 +138,226 @@ object Test {
   def process: AstNode => Node = {
 
     case x @ Value(value) =>
-      Node("Value", x.pos + ("value" -> value))
+      x.node("Value") + ("value" -> value)
 
     case x @ LiteralGroup(literal, value) => (
-      Node("LiteralGroup", x.pos + ("literal" -> literal))
+      x.node("LiteralGroup") + ("literal" -> literal)
         - prop("value") -> value
     )
 
+    case x @ Argument(id, tpe, defaultValue) => (
+      x.node("Argument")
+        - prop("id")           -> id
+        - prop("type")         -> tpe
+        - prop("defaultValue") -> defaultValue
+    )
+
+    case x @ IdReference(to, typeApplication) => (
+      x.node("IdReference")
+        - prop("to")              -> to
+        - prop("typeApplication") -< typeApplication
+    )
+
     case x @ Package(path, body) =>
-      val node = Node("Package", x.pos) -< _2(body)
+      val node = x.node("Package") - prop("body") -< body
 
       path map toNode[Id] match {
-        case NonEmptySeq.FromSeq(x) => node - prop("path") -> x.asChain(_ - "Next" -> _)
+        case NonEmptySeq.FromSeq(x) => node - prop("path") -< x
         case _                      => node
       }
 
     case x @ Class(name, typeArguments, arguments, extensions, body) => (
-      Node("Class", x.pos)
-        -< typeArguments
-        -< arguments
-        -< extensions
-        -< body
-        - prop("name") -> name
+      x.node("Class")
+        - prop("typeArguments") -< typeArguments
+        - prop("arguments")     -< arguments
+        - prop("extensions")    -< extensions
+        - prop("body")          -< body
+        - prop("name")          -> name
     )
 
     case x @ Object(name, typeArguments, extensions, body) => (
-      Node("Object", x.pos)
-        -< typeArguments
-        -< extensions
-        -< body
-        - prop("name") -> name
+      x.node("Object")
+        - prop("typeArguments") -< typeArguments
+        - prop("extensions")    -< extensions
+        - prop("body")          -< body
+        - prop("name")          -> name
     )
 
     case x @ Trait(name, typeArguments, arguments, extensions, body) => (
-      Node("Trait", x.pos)
-        -< typeArguments
-        -< arguments
-        -< extensions
-        -< body
-        - prop("name") -> name
+      x.node("Trait")
+        - prop("typeArguments") -< typeArguments
+        - prop("arguments")     -< arguments
+        - prop("extensions")    -< extensions
+        - prop("body")          -< body
+        - prop("name")           -> name
     )
 
     case x @ Def(name, typeArguments, arguments, tpe, body) => (
-      Node("Def", x.pos)
-        -< typeArguments
-        -< arguments
-        -< tpe
-        - prop("name") -> name
-        - "Child"      -> body
+      x.node("Def")
+        - prop("typeArguments") -< typeArguments
+        - prop("arguments")     -< arguments
+        - prop("type")          -< tpe
+        - prop("name")          -> name
+        - prop("body")          -> body
     )
 
     case x @ Val(name, typeArguments, tpe, body) => (
-      Node("Val", x.pos)
-        -< typeArguments
-        -< tpe
-        - prop("name") -> name
-        - "Child"      -> body
+      x.node("Val")
+        - prop("typeArguments") -< typeArguments
+        - prop("type")          -< tpe
+        - prop("name")          -> name
+        - prop("body")          -> body
     )
 
     case x @ TypeConstructor(name, typeArguments, body) => (
-      Node("TypeConstructor", x.pos)
-        -< typeArguments
-        - prop("name") -> name
-        - "Child"      -> body
+      x.node("TypeConstructor")
+        - prop("typeArguments") -< typeArguments
+        - prop("name")          -> name
+        - prop("body")          -> body
+    )
+
+    case x @ UnimplementedMember(id, typeArguments, arguments, tpe) => (
+      x.node("UnimplementedMember")
+        - prop("id")            -> id
+        - prop("typeArguments") -< typeArguments
+        - prop("arguments")     -< arguments
+        - prop("type")          -> tpe
     )
 
     case x @ MemberExtraction(target, names, source) =>
       val node = (
-        Node("MemberExtraction", x.pos)
+        x.node("MemberExtraction")
           - prop("source") -> source
-          - prop("names")  -> names.asChain(_ - "Next" -> _)
+          - prop("names")  -< names
       )
       toNode(target)
         .map(node - prop("target") -> _)
         .getOrElse(node)
 
     case x @ Marked(mark, statement) => (
-      Node("Marked", x.pos)
+      x.node("Marked")
         - prop("mark")      -> mark
         - prop("statement") -> statement
     )
 
     case x @ Comment(value) => (
-      Node("Comment", x.pos)
+      x.node("Comment")
         - prop("value") -> value
     )
 
     case x @ Import(value) => (
-      Node("Import", x.pos)
+      x.node("Import")
         - prop("import") -> value
     )
 
     case x @ Import.Single(path) => (
-      Node("Import.Single", x.pos)
+      x.node("Import.Single")
         - prop("path") -> path
     )
 
     case x @ Import.Multiple(path, parts) => (
-      Node("Import.Multiple", x.pos)
+      x.node("Import.Multiple")
         - prop("path")  -> path
-        - prop("parts") -> parts.asChain(_ - "Next" -> _)
+        - prop("parts") -< parts
     )
 
     case x @ Import.Id(id) => (
-      Node("Import.Id", x.pos)
+      x.node("Import.Id")
         - prop("id") -> id
     )
 
     case x @ Import.As(original, newId) => (
-      Node("Import.As", x.pos)
+      x.node("Import.As")
         - prop("original") -> original
         - prop("newId")    -> newId
     )
+
+    case x @ Extension(id, expression) => (
+      x.node("Extension")
+        - prop("expression") -> expression
+    )
+
+    case x @ Application(target, argument) => (
+      x.node("Application")
+        - prop("target")   -> target
+        - prop("argument") -> argument
+    )
+
+    case x @ Block(body) => (
+      x.node("Block")
+        - prop("body") -< body
+    )
+
+    case x @ BlockFunction(arguments, body) => (
+      x.node("BlockFunction")
+        - prop("arguments") -< arguments
+        - prop("body")      -< body
+    )
+
+    case x @ ByName(expression) => (
+      x.node("ByName")
+        - prop("expression") -> expression
+    )
+
+    case x @ Function(arguments, body) => (
+      x.node("Function")
+        - prop("arguments") -< arguments
+        - prop("body")      -> body
+    )
+
+    case x @ MarkedLiteralGroup(mark, literalGroup) => (
+      x.node("MarkedLiteralGroup")
+        - prop("mark")         -> mark
+        - prop("literalGroup") -> literalGroup
+    )
+
+    case x @ MemberAccess(target, member) => (
+      x.node("MemberAccess")
+        - prop("target") -> target
+        - prop("member") -> member
+    )
+
+    case x @ NamedProductApplication(target, arguments) => (
+      x.node("NamedProductApplication")
+        - prop("target")    -> target
+        - prop("arguments") -< arguments
+    )
+
+    case x @ NamedExpression(name, expression) => (
+      x.node("NamedExpression")
+        - prop("name")       -> name
+        - prop("expression") -> expression
+    )
+
+    case x @ Product(expressions) => (
+      x.node("Product")
+        - prop("expressions") -< expressions
+    )
+
+    case x @ ProductApplication(target, product) => (
+      x.node("ProductApplication")
+        - prop("target")  -> target
+        - prop("product") -> product
+    )
+
+    case x @ Expression.Reference(to) => (
+      x.node("Reference")
+        - prop("to") -> to
+    )
+
+    case x @ WhitespaceApplication(target, method, argument) => (
+      x.node("WhitespaceApplication")
+        - prop("target")   -> target
+        - prop("method")   -> method
+        - prop("argument") -> argument
+    )
   }
 
-  implicit class PosOps(p: AstNode) {
+  implicit class AstNodeOps(x: AstNode) {
+    def node(name: String) = Node(name, x.pos)
+
     def pos: Map[String, Any] = {
-      val Position(start, end) = p.position
+      val Position(start, end) = x.position
       Map("start" -> start, "end" -> end)
     }
   }
