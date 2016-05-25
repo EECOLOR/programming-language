@@ -16,6 +16,7 @@ import syntax.UsefulDataTypes
 import syntax.UsefulDataTypes._
 import syntax.ast.Expression
 import syntax.ast.Shared
+import play.api.libs.json.Json
 
 object Test {
   val file = new File("/home/eecolor/eecolor/programming-language/scala-light/src/main/scala/syntax/Parser.scala")
@@ -26,7 +27,7 @@ object Test {
     println(result)
     result match {
       case Parsed.Success(value, _) =>
-        process(value)
+        store(value)
       case Parsed.Failure(_, _, extra) =>
         println(extra.traced.trace)
     }
@@ -42,97 +43,45 @@ object Test {
     def asResult = Result(c.async())
   }
 
-  case class Prepared(statement: String, arguments: Map[String, Any], nodes: Set[String]) {
-    def + (other: Prepared) =
-      Prepared(statement + other.statement, arguments ++ other.arguments, nodes ++ other.nodes)
+  case class Prepared(statement: String, parameters: Map[String, Map[String, Any]]) {
+    def + (other: Prepared): Prepared =
+      if (other == Prepared.empty) this
+      else if (this == Prepared.empty) other
+      else Prepared(statement + "\n" + other.statement, parameters ++ other.parameters)
+
+    def asCypherStatement = CypherStatement(statement, parameters)
   }
-  case object N
-
-  def newId: String = "`" + UUID.randomUUID.toString + "`"
-
-  implicit class CypherHelper(val sc: StringContext) extends AnyVal {
-    def c(args: Any*): Prepared = {
-      val i = args.iterator
-      val Seq(first, rest @ _*) = sc.parts
-      val start = Prepared(first, Map.empty, Set.empty)
-      rest.foldLeft(start) {
-        case (Prepared(statement, arguments, nodes), part) =>
-          i.next match {
-            case id: String =>
-              Prepared(statement + id + part, arguments, nodes + id)
-            case m: Map[String, Any] =>
-              val id = newId
-              Prepared(s"$statement{ $id }$part", arguments + (id -> m), nodes)
-          }
-      }
-    }
+  object Prepared {
+    val empty: Prepared = Prepared("", Map.empty)
   }
 
-  def process(p: Package) = {
+  def newId: String = UUID.randomUUID.toString
+
+  def store(p: Package) = {
     implicit val wsclient = ning.NingWSClient()
     try {
-      val connection: Neo4jConnection = Neo4jREST("localhost", 7474, "neo4j", "neo4jj")
-
-      Cypher
+      implicit val connection: Neo4jConnection = Neo4jREST("localhost", 7474, "neo4j", "neo4jj")
+      import Neo4jTransaction._
+      import ExecutionContext.Implicits.global
+      val node = process(p)
+      val statement = node.toCypherCreateQuery.asCypherStatement
+      import Neo4jREST._
+      //println(Json.prettyPrint(Json.toJson(statement)))
+      statement.apply()
+      println(statement)
 
     } finally wsclient.close()
-
   }
 
-  case class Node(
-    label: String,
-    properties: Map[String, Any] = Map.empty,
-    relations: Set[Relation] = Set.empty
-  ) { self =>
-
-    val id = newId
-
-    case class - (r: Node => Relation) {
-      def -> [A](o: A)(implicit ev: A => Node)  = self.copy(relations = self.relations + r(o))
-      def -> [A](o: Option[A])(implicit ev: A => Node) =
-        o match {
-          case Some(o) => self.copy(relations = self.relations + r(o))
-          case None    => self
-        }
-
-      def -< (o: NonEmptySeq[Node]): Node = self.copy(relations = self.relations + r(o.asChain(_ - "Next" -> _)))
-
-      def -< (o: Seq[Node]): Node =
-        o match {
-          case NonEmptySeq.FromSeq(x) => this -< x
-          case _ => self
-        }
+  implicit class CypherNodeOps(n: Node) {
+    def toCypherCreateQuery: Prepared = {
+      import n._
+      val (preparedNodes, preparedRelations) = relations.foldLeft((Prepared.empty, Prepared.empty)) {
+        case ((nodes, relations), Relation(to, label, properties)) =>
+          (nodes + to.toCypherCreateQuery, relations + c"CREATE ($id)-[:$label { $properties }]->(${to.id})")
+      }
+      c"CREATE ($id:$label { $properties })" + preparedNodes + preparedRelations
     }
-
-    def + (prop: (String, Any)) = copy(properties = properties + prop)
-  }
-
-  case class Relation(to: Node, label: String, properties: Map[String, Any] = Map.empty)
-
-
-  import language.implicitConversions
-  implicit def stringToRelationBuilder(s: String): Node => Relation =
-    to => Relation(to, s)
-
-
-  implicit def _0(x: AstNode):Node = process(x)
-  implicit def _1(x: AstNode | AstNode ): AstNode = x.merge
-  implicit def _2[A](x: Seq[A])(implicit ev: A => AstNode): Seq[Node] = x map ev
-  implicit def _3[A](x: Option[A])(implicit ev: A => AstNode): Seq[Node] = x.toSeq
-  implicit def _4[A](x: NonEmptySeq[A])(implicit ev: A => AstNode): NonEmptySeq[Node] = x
-  implicit def _6[A](x: A)(implicit ev: A => AstNode): Node = toNode(x)
-  implicit def _7(x: Shared.Reference): Node = toNode(x)
-
-  def prop(name: String) = (to: Node) => Relation(to, "Property", Map("name" -> name))
-
-  def toNode[A](a: A)(implicit ev: A => AstNode): Node = ev(a)
-
-  def toNode(ref: Option[Shared.Reference]): Option[Node] = ref map toNode
-  def toNode(ref: Shared.Reference): Node =
-    ref.to.map(process).toSeq.reduceRight(_ - "Next" -> _)
-
-  implicit class Chainable[A](a: A)(implicit ev: A => NonEmptySeq[Node]) {
-    def asChain(f: (Node, Node) => Node) = a.toSeq reduceRight f
   }
 
   def process: AstNode => Node = {
@@ -251,23 +200,23 @@ object Test {
     )
 
     case x @ Import.Single(path) => (
-      x.node("Import.Single")
+      x.node("ImportSingle")
         - prop("path") -> path
     )
 
     case x @ Import.Multiple(path, parts) => (
-      x.node("Import.Multiple")
+      x.node("ImportMultiple")
         - prop("path")  -> path
         - prop("parts") -< parts
     )
 
     case x @ Import.Id(id) => (
-      x.node("Import.Id")
+      x.node("ImportId")
         - prop("id") -> id
     )
 
     case x @ Import.As(original, newId) => (
-      x.node("Import.As")
+      x.node("ImportAs")
         - prop("original") -> original
         - prop("newId")    -> newId
     )
@@ -359,6 +308,80 @@ object Test {
     def pos: Map[String, Any] = {
       val Position(start, end) = x.position
       Map("start" -> start, "end" -> end)
+    }
+  }
+
+  case class Node(
+    label: String,
+    properties: Map[String, Any] = Map.empty,
+    relations: Set[Relation] = Set.empty
+  ) { self =>
+
+    val id = newId
+
+    case class - (r: Node => Relation) {
+      def -> [A](o: A)(implicit ev: A => Node)  = self.copy(relations = self.relations + r(o))
+      def -> [A](o: Option[A])(implicit ev: A => Node) =
+        o match {
+          case Some(o) => self.copy(relations = self.relations + r(o))
+          case None    => self
+        }
+
+      def -< (o: NonEmptySeq[Node]): Node = self.copy(relations = self.relations + r(o.asChain(_ - "Next" -> _)))
+
+      def -< (o: Seq[Node]): Node =
+        o match {
+          case NonEmptySeq.FromSeq(x) => this -< x
+          case _ => self
+        }
+    }
+
+    def + (prop: (String, Any)) = copy(properties = properties + prop)
+  }
+
+  case class Relation(to: Node, label: String, properties: Map[String, Any] = Map.empty)
+
+
+  import language.implicitConversions
+  implicit def stringToRelationBuilder(s: String): Node => Relation =
+    to => Relation(to, s)
+
+
+  implicit def _0(x: AstNode):Node = process(x)
+  implicit def _1(x: AstNode | AstNode ): AstNode = x.merge
+  implicit def _2[A](x: Seq[A])(implicit ev: A => AstNode): Seq[Node] = x.map(toNode[A])
+  implicit def _3[A](x: Option[A])(implicit ev: A => AstNode): Seq[Node] = x.map(toNode[A]).toSeq
+  implicit def _4[A](x: NonEmptySeq[A])(implicit ev: A => AstNode): NonEmptySeq[Node] = x.map(toNode[A])
+  implicit def _6[A](x: A)(implicit ev: A => AstNode): Node = toNode(x)
+  implicit def _7(x: Shared.Reference): Node = toNode(x)
+
+  def prop(name: String) = (to: Node) => Relation(to, "Property", Map("name" -> name))
+
+  def toNode[A](a: A)(implicit ev: A => AstNode): Node = ev(a)
+
+  def toNode(ref: Option[Shared.Reference]): Option[Node] = ref map toNode
+  def toNode(ref: Shared.Reference): Node =
+    ref.to.map(process).toSeq.reduceRight(_ - "Next" -> _)
+
+  implicit class Chainable[A](a: A)(implicit ev: A => NonEmptySeq[Node]) {
+    def asChain(f: (Node, Node) => Node) = a.toSeq reduceRight f
+  }
+
+  implicit class CypherHelper(val sc: StringContext) extends AnyVal {
+    def c(args: Any*): Prepared = {
+      val i = args.iterator
+      val Seq(first, rest @ _*) = sc.parts
+      val start = Prepared(first, Map.empty)
+      rest.foldLeft(start) {
+        case (Prepared(statement, arguments), part) =>
+          i.next match {
+            case id: String =>
+              Prepared(s"$statement`$id`$part", arguments)
+            case m: Map[String, Any] =>
+              val id = newId
+              Prepared(s"$statement`$id`$part", arguments + (id -> m))
+          }
+      }
     }
   }
 }
